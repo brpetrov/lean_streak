@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "296684319013",
+    "project_id": "lean-streak-project",
+    "storage_bucket": "lean-streak-project.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:296684319013:android:b4da7fa1822509e4db6acc",
+        "android_client_info": {
+          "package_name": "com.example.lean_streak"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD6kEkNTzty4LCtUh3jneHCVxzoUwc8ymM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
