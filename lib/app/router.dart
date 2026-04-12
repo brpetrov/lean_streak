@@ -7,10 +7,11 @@ import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/auth/presentation/auth_screen.dart';
 import '../features/dashboard/presentation/dashboard_screen.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
+import '../features/profile/presentation/providers/user_profile_provider.dart';
 import '../shared/widgets/splash_screen.dart';
 
 // ---------------------------------------------------------------------------
-// Route names — use these constants everywhere instead of raw strings
+// Route names
 // ---------------------------------------------------------------------------
 class AppRoutes {
   AppRoutes._();
@@ -25,18 +26,29 @@ class AppRoutes {
 }
 
 // ---------------------------------------------------------------------------
-// A ChangeNotifier that re-notifies GoRouter whenever auth state changes.
+// Notifier — re-triggers GoRouter whenever auth or onboarding state changes.
 // ---------------------------------------------------------------------------
-class _AuthRouterNotifier extends ChangeNotifier {
-  _AuthRouterNotifier(Ref ref) {
+class _RouterNotifier extends ChangeNotifier {
+  _RouterNotifier(Ref ref) {
+    // Auth state changes.
     ref.listen<AsyncValue<User?>>(
       authStateProvider,
       (previous, next) {
-        if (previous?.valueOrNull != next.valueOrNull || previous?.isLoading != next.isLoading) {
+        if (previous?.valueOrNull != next.valueOrNull ||
+            previous?.isLoading != next.isLoading) {
           notifyListeners();
         }
       },
     );
+
+    // Onboarding completion changes.
+    ref.listen(userProfileProvider, (previous, next) {
+      final prevDone = previous?.valueOrNull?.onboardingCompleted;
+      final nextDone = next.valueOrNull?.onboardingCompleted;
+      if (prevDone != nextDone || previous?.isLoading != next.isLoading) {
+        notifyListeners();
+      }
+    });
   }
 }
 
@@ -44,7 +56,7 @@ class _AuthRouterNotifier extends ChangeNotifier {
 // GoRouter provider
 // ---------------------------------------------------------------------------
 final goRouterProvider = Provider<GoRouter>((ref) {
-  final notifier = _AuthRouterNotifier(ref);
+  final notifier = _RouterNotifier(ref);
 
   final router = GoRouter(
     initialLocation: AppRoutes.splash,
@@ -80,30 +92,46 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 });
 
 // ---------------------------------------------------------------------------
-// Redirect logic — called on every navigation + every auth state change
+// Redirect logic
 // ---------------------------------------------------------------------------
 String? _redirect(Ref ref, GoRouterState state) {
   final authValue = ref.read(authStateProvider);
   final location = state.matchedLocation;
 
-  // While Firebase is still initialising, stay on the splash screen.
+  // 1. Firebase still initialising — hold on splash.
   if (authValue.isLoading) {
     return location == AppRoutes.splash ? null : AppRoutes.splash;
   }
 
   final isAuthenticated = authValue.valueOrNull != null;
 
+  // 2. Not signed in — send to auth.
   if (!isAuthenticated) {
-    // Send unauthenticated users to /auth (unless already there).
-    if (location == AppRoutes.auth) return null;
-    return AppRoutes.auth;
+    return location == AppRoutes.auth ? null : AppRoutes.auth;
   }
 
-  // Authenticated — bounce off auth / splash pages.
-  // Onboarding check will be added in Phase 3.
-  if (location == AppRoutes.splash || location == AppRoutes.auth) {
+  // 3. Signed in — check onboarding.
+  final profileValue = ref.read(userProfileProvider);
+
+  // Profile stream still loading — hold on splash.
+  if (profileValue.isLoading) {
+    return location == AppRoutes.splash ? null : AppRoutes.splash;
+  }
+
+  final profile = profileValue.valueOrNull;
+  final onboardingDone = profile?.onboardingCompleted ?? false;
+
+  // No profile or onboarding incomplete — send to onboarding.
+  if (!onboardingDone) {
+    return location == AppRoutes.onboarding ? null : AppRoutes.onboarding;
+  }
+
+  // 4. Fully set up — bounce off auth / splash / onboarding.
+  if (location == AppRoutes.splash ||
+      location == AppRoutes.auth ||
+      location == AppRoutes.onboarding) {
     return AppRoutes.dashboard;
   }
 
-  return null; // No redirect needed.
+  return null;
 }
