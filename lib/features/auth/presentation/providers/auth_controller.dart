@@ -15,8 +15,7 @@ class AuthController extends AsyncNotifier<AuthStatus> {
   Future<void> signIn(String email, String password) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      final credential =
-          await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
@@ -31,11 +30,11 @@ class AuthController extends AsyncNotifier<AuthStatus> {
   Future<void> signUp(String email, String password) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      final credential =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email.trim(),
-        password: password,
-      );
+      final credential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: email.trim(),
+            password: password,
+          );
       await credential.user?.sendEmailVerification();
       await FirebaseAuth.instance.signOut();
       return AuthStatus.verificationSent;

@@ -6,8 +6,12 @@ import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  // Guard against double-init (can happen on hot-restart in web where the
+  // Flutter Dart state resets but the Firebase JS SDK stays alive).
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
   runApp(const ProviderScope(child: LeanStreakApp()));
 }

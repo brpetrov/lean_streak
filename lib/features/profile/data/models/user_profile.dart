@@ -16,6 +16,7 @@ enum Gender {
       Gender.values.firstWhere((e) => e.value == s);
 }
 
+/// How physically active the user is — used for TDEE calculation.
 enum ActivityLevel {
   light('light'),
   medium('medium'),
@@ -26,6 +27,19 @@ enum ActivityLevel {
 
   static ActivityLevel fromString(String s) =>
       ActivityLevel.values.firstWhere((e) => e.value == s);
+}
+
+/// How quickly the user wants to lose weight — determines target date & deficit.
+enum WeightLossPace {
+  slow('slow'),
+  moderate('moderate'),
+  fast('fast');
+
+  const WeightLossPace(this.value);
+  final String value;
+
+  static WeightLossPace fromString(String s) =>
+      WeightLossPace.values.firstWhere((e) => e.value == s);
 }
 
 enum GoalPaceLevel {
@@ -55,6 +69,7 @@ class UserProfile {
     required this.currentWeightKg,
     required this.targetWeightKg,
     required this.activityLevel,
+    required this.weightLossPace,
     required this.targetDate,
     required this.bmi,
     required this.bmr,
@@ -75,7 +90,13 @@ class UserProfile {
   final double heightCm;
   final double currentWeightKg;
   final double targetWeightKg;
+
+  /// Physical activity level — used to compute TDEE.
   final ActivityLevel activityLevel;
+
+  /// Desired weight loss pace — used to compute target date and daily deficit.
+  final WeightLossPace weightLossPace;
+
   final DateTime targetDate;
 
   // Calculated fields — derived during onboarding, stored for quick reads.
@@ -92,7 +113,8 @@ class UserProfile {
 
   // ── Serialisation ──────────────────────────────────────────────────────
 
-  factory UserProfile.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
+  factory UserProfile.fromFirestore(
+      DocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data()!;
     return UserProfile(
       uid: d['uid'] as String,
@@ -104,6 +126,7 @@ class UserProfile {
       currentWeightKg: (d['currentWeightKg'] as num).toDouble(),
       targetWeightKg: (d['targetWeightKg'] as num).toDouble(),
       activityLevel: ActivityLevel.fromString(d['activityLevel'] as String),
+      weightLossPace: WeightLossPace.fromString(d['weightLossPace'] as String),
       targetDate: (d['targetDate'] as Timestamp).toDate(),
       bmi: (d['bmi'] as num).toDouble(),
       bmr: (d['bmr'] as num).toDouble(),
@@ -127,6 +150,7 @@ class UserProfile {
         'currentWeightKg': currentWeightKg,
         'targetWeightKg': targetWeightKg,
         'activityLevel': activityLevel.value,
+        'weightLossPace': weightLossPace.value,
         'targetDate': Timestamp.fromDate(targetDate),
         'bmi': bmi,
         'bmr': bmr,
@@ -151,6 +175,7 @@ class UserProfile {
     double? currentWeightKg,
     double? targetWeightKg,
     ActivityLevel? activityLevel,
+    WeightLossPace? weightLossPace,
     DateTime? targetDate,
     double? bmi,
     double? bmr,
@@ -172,6 +197,7 @@ class UserProfile {
       currentWeightKg: currentWeightKg ?? this.currentWeightKg,
       targetWeightKg: targetWeightKg ?? this.targetWeightKg,
       activityLevel: activityLevel ?? this.activityLevel,
+      weightLossPace: weightLossPace ?? this.weightLossPace,
       targetDate: targetDate ?? this.targetDate,
       bmi: bmi ?? this.bmi,
       bmr: bmr ?? this.bmr,
