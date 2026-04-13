@@ -939,6 +939,77 @@ the login screen just do the standard either biometric or rembmer of previous lo
 
 ---
 
+## Phase 5.5 — AI calorie estimator
+
+### Overview
+
+Users often do not know how many calories a meal contains.
+This phase adds a lightweight AI estimation button inside the meal logging flow.
+The user describes their meal in plain language and the app returns a calorie estimate instantly.
+
+No food database is used. Natural language descriptions ("a big bowl of pasta with tomato sauce",
+"chicken wrap from the cafe") are handled better by AI than by a keyword search index.
+
+### Data source
+
+- **Google Gemini 2.5 Flash** via `google_generative_ai` Dart package
+  - Free tier: 1,500 requests/day (sufficient for personal and small-scale use)
+  - Paid tier if exceeded: ~$0.00005 per estimate — negligible at any realistic scale
+  - One API key from Google AI Studio (no credit card required)
+
+### Daily usage limit
+
+Each user is limited to **10 AI estimates per day**.
+Usage is tracked in Firestore at `users/{uid}/ai_usage/{yyyy-MM-dd}` as `{ count: int }`.
+The document path changes every day, so the counter resets automatically at midnight.
+This keeps the free Gemini tier well within limits even across many users, and is trivial to raise later.
+
+### Tasks
+
+1. Add `google_generative_ai` package to `pubspec.yaml`.
+2. Store the Gemini API key in `lib/core/config/api_keys.dart` (add to `.gitignore`).
+3. Create `AiUsageRepository` — reads and increments the daily count in Firestore.
+4. Create `CalorieEstimateService` — checks usage limit, calls Gemini, parses response, increments count.
+5. Add an "Estimate with AI" button below the calorie input in `log_meal_sheet.dart`.
+6. Tapping it reveals an inline description field. User types their meal and taps **"Estimate"**.
+7. Show a loading indicator, then display the result card with kcal + one-line note.
+8. **"Use this"** pre-fills the calorie input (still editable).
+9. Show remaining estimates for the day (e.g. "7 of 10 remaining").
+10. When limit is reached, disable the button and show "Daily limit reached — resets tomorrow".
+
+### Prompt design
+
+```
+You are a nutrition assistant. The user will describe a meal.
+Respond with ONLY a JSON object: {"kcal": <integer>, "note": "<one short sentence explaining the estimate>"}.
+Do not include any other text. Be concise and practical — estimate for a typical portion.
+
+Meal: {userInput}
+```
+
+### UX flow
+
+1. User is on the log meal sheet, calorie field is empty (or they are unsure).
+2. They tap **"Not sure? Estimate with AI"** (shows remaining count e.g. "7 of 10 left today").
+3. A small text field expands inline. User types their meal description and taps **"Estimate"**.
+4. Loading spinner shown, then result card appears:
+   > **~480 kcal** — Typical grilled chicken wrap with lettuce and sauce.
+5. **"Use this"** fills the calorie input. User can adjust before saving.
+6. If the daily limit is hit, button shows "Daily limit reached — resets tomorrow" and is disabled.
+7. If the API fails, show a short error and let the user type calories manually.
+
+### Acceptance criteria
+
+- Estimate returns a reasonable kcal number for common meal descriptions
+- Daily usage is tracked correctly and resets each day
+- Button is disabled when limit is reached with a clear message
+- Remaining count is visible to the user
+- Result pre-fills the calorie input correctly
+- API key is not committed to git
+- App works normally if the service is unavailable (graceful error, manual entry still works)
+
+---
+
 ## Phase 6 — Meal logging feature
 
 ### Tasks
