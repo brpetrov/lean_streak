@@ -18,6 +18,17 @@ class MealRepository {
     await _meals(uid).doc(meal.id).set(meal.toFirestore());
   }
 
+  Future<void> updateMeal(String uid, Meal meal) async {
+    await _meals(uid).doc(meal.id).set(meal.toFirestore());
+  }
+
+  Future<List<Meal>> fetchMealsForDate(String uid, String date) async {
+    final snapshot = await _meals(uid).where('date', isEqualTo: date).get();
+    final meals = snapshot.docs.map((doc) => Meal.fromFirestore(doc)).toList();
+    meals.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+    return meals;
+  }
+
   /// Streams all meals for [uid] on [date] (yyyy-MM-dd), ordered by timestamp.
   Stream<List<Meal>> watchMealsForDate(String uid, String date) {
     return _meals(uid)

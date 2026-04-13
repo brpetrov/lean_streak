@@ -11,12 +11,15 @@ import 'providers/ai_usage_provider.dart';
 import 'providers/log_meal_controller.dart';
 
 /// Opens the log-meal bottom sheet from any screen.
-Future<void> showLogMealSheet(BuildContext context) {
+Future<void> showLogMealSheet(
+  BuildContext context, {
+  Meal? existingMeal,
+}) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => const _LogMealSheet(),
+    builder: (_) => _LogMealSheet(existingMeal: existingMeal),
   );
 }
 
@@ -25,7 +28,9 @@ Future<void> showLogMealSheet(BuildContext context) {
 // ---------------------------------------------------------------------------
 
 class _LogMealSheet extends ConsumerStatefulWidget {
-  const _LogMealSheet();
+  const _LogMealSheet({this.existingMeal});
+
+  final Meal? existingMeal;
 
   @override
   ConsumerState<_LogMealSheet> createState() => _LogMealSheetState();
@@ -45,6 +50,20 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
   bool _estimating = false;
   CalorieEstimate? _estimate;
   String? _estimateError;
+
+  bool get _isEditing => widget.existingMeal != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final meal = widget.existingMeal;
+    if (meal == null) return;
+
+    _mealType = meal.mealType;
+    _caloriesController.text = meal.calories.round().toString();
+    _selectedTags.addAll(meal.tags);
+    _noteController.text = meal.note ?? '';
+  }
 
   @override
   void dispose() {
@@ -74,6 +93,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
     await ref
         .read(logMealControllerProvider.notifier)
         .submit(
+          existingMeal: widget.existingMeal,
           mealType: _mealType!,
           calories: calories!,
           tags: _selectedTags.toList(),
@@ -191,8 +211,8 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'Log Meal',
+                  Text(
+                    _isEditing ? 'Edit Meal' : 'Log Meal',
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
@@ -373,8 +393,8 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
                               color: Colors.white,
                             ),
                           )
-                        : const Text(
-                            'Save Meal',
+                        : Text(
+                            _isEditing ? 'Update Meal' : 'Save Meal',
                             style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w600,

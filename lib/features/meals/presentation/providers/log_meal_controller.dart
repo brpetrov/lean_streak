@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../dashboard/presentation/providers/daily_summary_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/models/meal.dart';
 import 'meal_provider.dart';
@@ -10,6 +11,7 @@ class LogMealController extends AsyncNotifier<void> {
   Future<void> build() async {}
 
   Future<void> submit({
+    Meal? existingMeal,
     required MealType mealType,
     required double calories,
     required List<MealTag> tags,
@@ -22,24 +24,41 @@ class LogMealController extends AsyncNotifier<void> {
 
       final repo = ref.read(mealRepositoryProvider);
       final now = DateTime.now();
-      final date = DateFormat('yyyy-MM-dd').format(now);
-
-      // Let Firestore generate a stable document ID before creating the model.
-      final docRef = repo.newMealRef(uid);
+      final date = existingMeal?.date ?? DateFormat('yyyy-MM-dd').format(now);
+      final docRef = existingMeal == null ? repo.newMealRef(uid) : null;
 
       final meal = Meal(
-        id: docRef.id,
+        id: existingMeal?.id ?? docRef!.id,
         date: date,
-        timestamp: now,
+        timestamp: existingMeal?.timestamp ?? now,
         mealType: mealType,
         calories: calories,
         tags: tags,
         note: (note?.trim().isEmpty ?? true) ? null : note!.trim(),
-        createdAt: now,
+        createdAt: existingMeal?.createdAt ?? now,
         updatedAt: now,
       );
 
-      await repo.addMeal(uid, meal);
+      if (existingMeal == null) {
+        await repo.addMeal(uid, meal);
+      } else {
+        await repo.updateMeal(uid, meal);
+      }
+
+      await ref.read(dailySummaryServiceProvider).recomputeForDate(uid, date);
+    });
+  }
+
+  Future<void> delete(Meal meal) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final uid = ref.read(currentUidProvider);
+      if (uid == null) throw Exception('Not authenticated');
+
+      await ref.read(mealRepositoryProvider).deleteMeal(uid, meal.id);
+      await ref
+          .read(dailySummaryServiceProvider)
+          .recomputeForDate(uid, meal.date);
     });
   }
 }
