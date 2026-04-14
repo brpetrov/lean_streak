@@ -94,13 +94,17 @@ class DashboardScreen extends ConsumerWidget {
           }
 
           final mealsAsync = ref.watch(mealsForDateProvider(dateKey));
-          final savedSummary =
-              ref.watch(dailySummaryForDateProvider(dateKey)).valueOrNull;
+          final savedSummary = ref
+              .watch(dailySummaryForDateProvider(dateKey))
+              .valueOrNull;
 
           return mealsAsync.when(
             data: (meals) {
-              final summary = savedSummary ??
-                  ref.read(dailySummaryServiceProvider).buildSummary(
+              final summary =
+                  savedSummary ??
+                  ref
+                      .read(dailySummaryServiceProvider)
+                      .buildSummary(
                         date: dateKey,
                         meals: meals,
                         dailyCalorieTarget: profile.dailyCalorieTarget,
@@ -210,10 +214,7 @@ class _DashboardContent extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: [
-        _HeaderSection(
-          date: date,
-          name: profile.name,
-        ),
+        _HeaderSection(date: date, name: profile.name),
         const SizedBox(height: 20),
         FilledButton.icon(
           onPressed: onLogMeal,
@@ -227,19 +228,13 @@ class _DashboardContent extends StatelessWidget {
           icon: const Icon(Icons.add),
           label: const Text(
             'Log Meal',
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-            ),
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
           ),
         ),
         const SizedBox(height: 16),
         _CalorieOverviewCard(summary: summary),
         const SizedBox(height: 16),
-        _ScoreCard(
-          summary: summary,
-          onOpenScoreInfo: onOpenScoreInfo,
-        ),
+        _ScoreCard(summary: summary, onOpenScoreInfo: onOpenScoreInfo),
         const SizedBox(height: 24),
         Row(
           children: [
@@ -294,10 +289,7 @@ class _DashboardContent extends StatelessWidget {
 }
 
 class _HeaderSection extends StatelessWidget {
-  const _HeaderSection({
-    required this.date,
-    required this.name,
-  });
+  const _HeaderSection({required this.date, required this.name});
 
   final DateTime date;
   final String name;
@@ -348,8 +340,7 @@ class _CalorieOverviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final remainingCalories = summary.targetCalories - summary.totalCalories;
-    final remainingLabel =
-        remainingCalories >= 0 ? 'Remaining' : 'Over target';
+    final remainingLabel = remainingCalories >= 0 ? 'Remaining' : 'Over target';
     final remainingValue = remainingCalories >= 0
         ? '$remainingCalories kcal'
         : '${remainingCalories.abs()} kcal';
@@ -419,10 +410,7 @@ class _CalorieOverviewCard extends StatelessWidget {
 }
 
 class _ScoreCard extends StatelessWidget {
-  const _ScoreCard({
-    required this.summary,
-    required this.onOpenScoreInfo,
-  });
+  const _ScoreCard({required this.summary, required this.onOpenScoreInfo});
 
   final DailySummary summary;
   final VoidCallback onOpenScoreInfo;
@@ -509,10 +497,7 @@ class _ScoreCard extends StatelessWidget {
           const SizedBox(height: 6),
           const Text(
             'How today\'s result was built:',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 14),
           ...summary.explanation.map((item) {
@@ -695,10 +680,7 @@ class _MealCard extends StatelessWidget {
                   onDelete();
                 },
                 itemBuilder: (context) => const [
-                  PopupMenuItem(
-                    value: _MealAction.edit,
-                    child: Text('Edit'),
-                  ),
+                  PopupMenuItem(value: _MealAction.edit, child: Text('Edit')),
                   PopupMenuItem(
                     value: _MealAction.delete,
                     child: Text('Delete'),
@@ -711,32 +693,55 @@ class _MealCard extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: meal.tags.map((tag) {
-              final color =
-                  tag.isPositive ? AppColors.tagPositive : AppColors.tagWarning;
-              final background = tag.isPositive
-                  ? AppColors.tagPositiveBg
-                  : AppColors.tagWarningBg;
+            children: [
+              ...meal.tags.map((tag) {
+                final color = tag.isPositive
+                    ? AppColors.tagPositive
+                    : AppColors.tagWarning;
+                final background = tag.isPositive
+                    ? AppColors.tagPositiveBg
+                    : AppColors.tagWarningBg;
 
-              return Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: background,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  tag.label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: color,
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: background,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    tag.label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                  ),
+                );
+              }),
+              if (meal.afterMealFeeling != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceVariant,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: AppColors.divider),
+                  ),
+                  child: Text(
+                    meal.afterMealFeeling!.label,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ),
-              );
-            }).toList(),
+            ],
           ),
           if (meal.note != null) ...[
             const SizedBox(height: 12),
@@ -754,14 +759,6 @@ class _MealCard extends StatelessWidget {
   }
 }
 
-enum _MealAction {
-  edit,
-  delete,
-}
+enum _MealAction { edit, delete }
 
-enum _DashboardMenuAction {
-  scoreInfo,
-  history,
-  weeklyReview,
-  signOut,
-}
+enum _DashboardMenuAction { scoreInfo, history, weeklyReview, signOut }

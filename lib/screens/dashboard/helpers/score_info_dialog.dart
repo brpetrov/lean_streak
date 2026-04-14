@@ -37,7 +37,7 @@ Future<void> showScoreInfoDialog(BuildContext context) {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Your daily score starts at 5 out of 10. Points are then added or removed based on calories and meal tags.',
+                    'Your daily score starts at 5 out of 10. It then moves up or down based on how close the full day was to target, how complete the logging looks, which meal tags showed up, and whether meals left you too full.',
                     style: TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,
@@ -52,12 +52,22 @@ Future<void> showScoreInfoDialog(BuildContext context) {
                       'Within 10% of target: +1',
                       '10% to 20% above target: -1',
                       'More than 20% above target: -2',
-                      'More than 25% below target: -1',
+                      '10% to 25% below target: -1',
+                      '25% to 50% below target: -2',
+                      'More than 50% below target: -3',
                     ],
                   ),
                   const SizedBox(height: 16),
                   const _ScoreInfoSection(
-                    title: 'Positive meal tags',
+                    title: 'Logging completeness',
+                    items: [
+                      'Only 1 meal logged in the day: -1',
+                      'A very low total day is treated as incomplete, even if the meal quality was good',
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const _ScoreInfoSection(
+                    title: 'Healthier choice tags',
                     items: [
                       'At least 1 high protein meal: +1',
                       'At least 1 balanced meal: +1',
@@ -66,12 +76,19 @@ Future<void> showScoreInfoDialog(BuildContext context) {
                   ),
                   const SizedBox(height: 16),
                   const _ScoreInfoSection(
-                    title: 'Warning tags',
+                    title: 'Things to limit',
                     items: [
-                      'Any overate tag: -2',
-                      '2 or more processed tags: -1',
-                      '2 or more sugary tags: -1',
-                      'Alcohol and overate on the same day: extra -1',
+                      'Any High Sugar tag in the day: -1',
+                      'Any Fried tag in the day: -1',
+                      'Any Highly Processed tag in the day: -1',
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const _ScoreInfoSection(
+                    title: 'After the meal',
+                    items: [
+                      'Any Too Full selection in the day: -2',
+                      'Satisfied and Still Hungry are tracked, but do not change the score in this version',
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -93,7 +110,7 @@ Future<void> showScoreInfoDialog(BuildContext context) {
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: const Text(
-                      'If no meals are logged, the score is set to 0 and the category is Very bad. The explanation tells you exactly what affected your result.',
+                      'The score is meant to reflect the whole day, not just whether one meal looked healthy. If no meals are logged, the score is set to 0 and the category is Very bad.',
                       style: TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,
@@ -112,10 +129,7 @@ Future<void> showScoreInfoDialog(BuildContext context) {
 }
 
 class _ScoreInfoSection extends StatelessWidget {
-  const _ScoreInfoSection({
-    required this.title,
-    required this.items,
-  });
+  const _ScoreInfoSection({required this.title, required this.items});
 
   final String title;
   final List<String> items;

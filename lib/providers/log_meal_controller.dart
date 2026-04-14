@@ -15,6 +15,7 @@ class LogMealController extends AsyncNotifier<void> {
     required MealType mealType,
     required double calories,
     required List<MealTag> tags,
+    MealFeeling? afterMealFeeling,
     String? note,
   }) async {
     state = const AsyncLoading();
@@ -34,6 +35,7 @@ class LogMealController extends AsyncNotifier<void> {
         mealType: mealType,
         calories: calories,
         tags: tags,
+        afterMealFeeling: afterMealFeeling,
         note: (note?.trim().isEmpty ?? true) ? null : note!.trim(),
         createdAt: existingMeal?.createdAt ?? now,
         updatedAt: now,

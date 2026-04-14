@@ -54,16 +54,14 @@ class CalorieEstimateService {
     }
 
     try {
-      final model = GenerativeModel(
-        model: _modelId,
-        apiKey: ApiKeys.gemini,
+      final model = GenerativeModel(model: _modelId, apiKey: ApiKeys.gemini);
+
+      final prompt = _promptTemplate.replaceFirst(
+        '{input}',
+        description.trim(),
       );
 
-      final prompt =
-          _promptTemplate.replaceFirst('{input}', description.trim());
-
-      final response =
-          await model.generateContent([Content.text(prompt)]);
+      final response = await model.generateContent([Content.text(prompt)]);
 
       final raw = response.text?.trim() ?? '';
 

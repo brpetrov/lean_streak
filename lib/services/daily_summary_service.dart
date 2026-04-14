@@ -9,9 +9,9 @@ class DailySummaryService {
     required MealRepository mealRepository,
     required UserProfileRepository userProfileRepository,
     required DailySummaryRepository dailySummaryRepository,
-  })  : _mealRepository = mealRepository,
-        _userProfileRepository = userProfileRepository,
-        _dailySummaryRepository = dailySummaryRepository;
+  }) : _mealRepository = mealRepository,
+       _userProfileRepository = userProfileRepository,
+       _dailySummaryRepository = dailySummaryRepository;
 
   final MealRepository _mealRepository;
   final UserProfileRepository _userProfileRepository;
@@ -60,9 +60,11 @@ class DailySummaryService {
       return sum + meal.calories.round();
     });
     final calorieDelta = totalCalories - targetCalories;
-    final calorieRatio =
-        targetCalories == 0 ? 0.0 : totalCalories / targetCalories;
+    final calorieRatio = targetCalories == 0
+        ? 0.0
+        : totalCalories / targetCalories;
     final tagCounts = _buildTagCounts(meals);
+    final feelingCounts = _buildFeelingCounts(meals);
     final explanation = <String>[];
     var score = 5;
 
@@ -78,11 +80,24 @@ class DailySummaryService {
     } else if (calorieRatio > 1.20) {
       score -= 2;
       explanation.add('Went well above calorie target');
-    } else if (calorieRatio < 0.75) {
+    } else if (calorieRatio >= 0.75 && calorieRatio < 0.90) {
       score -= 1;
-      explanation.add('Ate well below calorie target');
+      explanation.add('Finished the day below calorie target');
+    } else if (calorieRatio >= 0.50 && calorieRatio < 0.75) {
+      score -= 2;
+      explanation.add('Ate far below calorie target');
+    } else if (calorieRatio < 0.50) {
+      score -= 3;
+      explanation.add('Logged far too little for a full day');
     } else {
-      explanation.add('Calories were off target, but not enough to change the score');
+      explanation.add(
+        'Calories were off target, but not enough to change the score',
+      );
+    }
+
+    if (meals.length == 1) {
+      score -= 1;
+      explanation.add('Only one meal was logged, so the day looks incomplete');
     }
 
     if ((tagCounts[MealTag.highProtein.value] ?? 0) >= 1) {
@@ -100,25 +115,25 @@ class DailySummaryService {
       explanation.add('Included fruit and veg more than once');
     }
 
-    if ((tagCounts[MealTag.overate.value] ?? 0) >= 1) {
-      score -= 2;
-      explanation.add('Had an overeating meal');
-    }
-
-    if ((tagCounts[MealTag.processed.value] ?? 0) >= 2) {
-      score -= 1;
-      explanation.add('Processed meals showed up multiple times');
-    }
-
-    if ((tagCounts[MealTag.sugary.value] ?? 0) >= 2) {
-      score -= 1;
-      explanation.add('Sugary meals showed up multiple times');
-    }
-
-    if ((tagCounts[MealTag.alcohol.value] ?? 0) >= 1 &&
+    if ((feelingCounts[MealFeeling.tooFull.value] ?? 0) >= 1 ||
         (tagCounts[MealTag.overate.value] ?? 0) >= 1) {
+      score -= 2;
+      explanation.add('One or more meals left you too full');
+    }
+
+    if ((tagCounts[MealTag.sugary.value] ?? 0) >= 1) {
       score -= 1;
-      explanation.add('Alcohol and overeating happened on the same day');
+      explanation.add('High sugar showed up in the day');
+    }
+
+    if ((tagCounts[MealTag.fried.value] ?? 0) >= 1) {
+      score -= 1;
+      explanation.add('Fried food showed up in the day');
+    }
+
+    if ((tagCounts[MealTag.processed.value] ?? 0) >= 1) {
+      score -= 1;
+      explanation.add('Highly processed food showed up in the day');
     }
 
     final clampedScore = score.clamp(0, 10);
@@ -145,6 +160,18 @@ class DailySummaryService {
       for (final tag in meal.tags) {
         counts[tag.value] = (counts[tag.value] ?? 0) + 1;
       }
+    }
+
+    return counts;
+  }
+
+  Map<String, int> _buildFeelingCounts(List<Meal> meals) {
+    final counts = <String, int>{};
+
+    for (final meal in meals) {
+      final feeling = meal.afterMealFeeling;
+      if (feeling == null) continue;
+      counts[feeling.value] = (counts[feeling.value] ?? 0) + 1;
     }
 
     return counts;
