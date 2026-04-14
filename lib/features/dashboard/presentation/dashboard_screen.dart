@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../auth/presentation/providers/auth_controller.dart';
 import '../../auth/presentation/providers/auth_provider.dart';
 import '../data/models/daily_summary.dart';
 import '../../meals/data/models/meal.dart';
@@ -22,10 +23,30 @@ class DashboardScreen extends ConsumerWidget {
     final dateKey = DateFormat('yyyy-MM-dd').format(today);
     final mealsAsync = ref.watch(mealsForDateProvider(dateKey));
     final summary = ref.watch(dailySummaryForDateProvider(dateKey)).valueOrNull;
+    final authState = ref.watch(authControllerProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('LeanStreak')),
+      appBar: AppBar(
+        title: const Text('LeanStreak'),
+        actions: [
+          IconButton(
+            tooltip: 'Log out',
+            onPressed: authState.isLoading
+                ? null
+                : () async {
+                    await ref.read(authControllerProvider.notifier).signOut();
+                  },
+            icon: authState.isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.logout_rounded),
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: mealsAsync.when(
