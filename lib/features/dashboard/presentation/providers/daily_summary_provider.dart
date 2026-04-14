@@ -20,9 +20,9 @@ final dailySummaryServiceProvider = Provider<DailySummaryService>((ref) {
   );
 });
 
-final dailySummaryForDateProvider =
-    StreamProvider.autoDispose.family<DailySummary?, String>((ref, date) {
-  final uid = ref.watch(currentUidProvider);
-  if (uid == null) return Stream.value(null);
-  return ref.watch(dailySummaryRepositoryProvider).watchSummary(uid, date);
-});
+final dailySummaryForDateProvider = StreamProvider.autoDispose
+    .family<DailySummary?, String>((ref, date) {
+      final uid = ref.watch(currentUidProvider);
+      if (uid == null) return Stream.value(null);
+      return ref.watch(dailySummaryRepositoryProvider).watchSummary(uid, date);
+    });

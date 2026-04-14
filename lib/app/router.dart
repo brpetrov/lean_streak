@@ -6,8 +6,10 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/auth/presentation/auth_screen.dart';
 import '../features/dashboard/presentation/dashboard_screen.dart';
+import '../features/history/presentation/history_screen.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/profile/presentation/providers/user_profile_provider.dart';
+import '../features/weekly_review/presentation/weekly_review_screen.dart';
 import '../shared/widgets/splash_screen.dart';
 
 // ---------------------------------------------------------------------------
@@ -79,10 +81,16 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.dashboard,
         builder: (context, state) => const DashboardScreen(),
       ),
+      GoRoute(
+        path: AppRoutes.history,
+        builder: (context, state) => const HistoryScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.weeklyReview,
+        builder: (context, state) => const WeeklyReviewScreen(),
+      ),
       // Additional routes wired in later phases:
       // GoRoute(path: AppRoutes.logMeal, ...),
-      // GoRoute(path: AppRoutes.history, ...),
-      // GoRoute(path: AppRoutes.weeklyReview, ...),
       // GoRoute(path: AppRoutes.profile, ...),
     ],
   );
