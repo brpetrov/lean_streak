@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../core/theme/app_theme.dart';
-import 'router.dart';
+import 'package:lean_streak/app/router.dart';
+import 'package:lean_streak/core/theme/app_theme.dart';
 
 class LeanStreakApp extends ConsumerWidget {
   const LeanStreakApp({super.key});

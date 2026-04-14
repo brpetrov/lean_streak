@@ -3,14 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../features/auth/presentation/providers/auth_provider.dart';
-import '../features/auth/presentation/auth_screen.dart';
-import '../features/dashboard/presentation/dashboard_screen.dart';
-import '../features/history/presentation/history_screen.dart';
-import '../features/onboarding/presentation/onboarding_screen.dart';
-import '../features/profile/presentation/providers/user_profile_provider.dart';
-import '../features/weekly_review/presentation/weekly_review_screen.dart';
-import '../shared/widgets/splash_screen.dart';
+import 'package:lean_streak/providers/auth_provider.dart';
+import 'package:lean_streak/providers/user_profile_provider.dart';
+import 'package:lean_streak/screens/auth/auth_screen.dart';
+import 'package:lean_streak/screens/dashboard/dashboard_screen.dart';
+import 'package:lean_streak/screens/history/history_screen.dart';
+import 'package:lean_streak/screens/onboarding/onboarding_screen.dart';
+import 'package:lean_streak/screens/weekly_review/weekly_review_screen.dart';
+import 'package:lean_streak/widgets/splash_screen.dart';
 
 // ---------------------------------------------------------------------------
 // Route names
