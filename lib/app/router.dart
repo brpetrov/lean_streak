@@ -7,8 +7,9 @@ import 'package:lean_streak/providers/auth_provider.dart';
 import 'package:lean_streak/providers/user_profile_provider.dart';
 import 'package:lean_streak/screens/auth/auth_screen.dart';
 import 'package:lean_streak/screens/dashboard/dashboard_screen.dart';
-import 'package:lean_streak/screens/history/history_screen.dart';
 import 'package:lean_streak/screens/onboarding/onboarding_screen.dart';
+import 'package:lean_streak/screens/profile/profile_screen.dart';
+import 'package:lean_streak/screens/review/review_screen.dart';
 import 'package:lean_streak/screens/weekly_review/weekly_review_screen.dart';
 import 'package:lean_streak/widgets/splash_screen.dart';
 
@@ -22,7 +23,7 @@ class AppRoutes {
   static const onboarding = '/onboarding';
   static const dashboard = '/dashboard';
   static const logMeal = '/log-meal';
-  static const history = '/history';
+  static const review = '/review';
   static const weeklyReview = '/weekly-review';
   static const profile = '/profile';
 }
@@ -33,15 +34,12 @@ class AppRoutes {
 class _RouterNotifier extends ChangeNotifier {
   _RouterNotifier(Ref ref) {
     // Auth state changes.
-    ref.listen<AsyncValue<User?>>(
-      authStateProvider,
-      (previous, next) {
-        if (previous?.valueOrNull != next.valueOrNull ||
-            previous?.isLoading != next.isLoading) {
-          notifyListeners();
-        }
-      },
-    );
+    ref.listen<AsyncValue<User?>>(authStateProvider, (previous, next) {
+      if (previous?.valueOrNull != next.valueOrNull ||
+          previous?.isLoading != next.isLoading) {
+        notifyListeners();
+      }
+    });
 
     // Onboarding completion changes.
     ref.listen(userProfileProvider, (previous, next) {
@@ -82,16 +80,19 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const DashboardScreen(),
       ),
       GoRoute(
-        path: AppRoutes.history,
-        builder: (context, state) => const HistoryScreen(),
+        path: AppRoutes.review,
+        builder: (context, state) => const ReviewScreen(),
       ),
       GoRoute(
         path: AppRoutes.weeklyReview,
         builder: (context, state) => const WeeklyReviewScreen(),
       ),
+      GoRoute(
+        path: AppRoutes.profile,
+        builder: (context, state) => const ProfileScreen(),
+      ),
       // Additional routes wired in later phases:
       // GoRoute(path: AppRoutes.logMeal, ...),
-      // GoRoute(path: AppRoutes.profile, ...),
     ],
   );
 

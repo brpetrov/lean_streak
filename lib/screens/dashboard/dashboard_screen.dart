@@ -42,8 +42,10 @@ class DashboardScreen extends ConsumerWidget {
               switch (action) {
                 case _DashboardMenuAction.scoreInfo:
                   showScoreInfoDialog(context);
-                case _DashboardMenuAction.history:
-                  context.push(AppRoutes.history);
+                case _DashboardMenuAction.profile:
+                  context.push(AppRoutes.profile);
+                case _DashboardMenuAction.review:
+                  context.push(AppRoutes.review);
                 case _DashboardMenuAction.weeklyReview:
                   context.push(AppRoutes.weeklyReview);
                 case _DashboardMenuAction.signOut:
@@ -57,8 +59,12 @@ class DashboardScreen extends ConsumerWidget {
                 child: Text('How scoring works'),
               ),
               const PopupMenuItem(
-                value: _DashboardMenuAction.history,
-                child: Text('History'),
+                value: _DashboardMenuAction.profile,
+                child: Text('Edit Profile'),
+              ),
+              const PopupMenuItem(
+                value: _DashboardMenuAction.review,
+                child: Text('Review'),
               ),
               const PopupMenuItem(
                 value: _DashboardMenuAction.weeklyReview,
@@ -117,6 +123,7 @@ class DashboardScreen extends ConsumerWidget {
                 summary: summary,
                 onOpenScoreInfo: () => showScoreInfoDialog(context),
                 onLogMeal: () => showLogMealSheet(context),
+                onOpenReview: () => context.push(AppRoutes.review),
                 onEditMeal: (meal) {
                   showLogMealSheet(context, existingMeal: meal);
                 },
@@ -196,6 +203,7 @@ class _DashboardContent extends StatelessWidget {
     required this.summary,
     required this.onOpenScoreInfo,
     required this.onLogMeal,
+    required this.onOpenReview,
     required this.onEditMeal,
     required this.onDeleteMeal,
   });
@@ -206,6 +214,7 @@ class _DashboardContent extends StatelessWidget {
   final DailySummary summary;
   final VoidCallback onOpenScoreInfo;
   final VoidCallback onLogMeal;
+  final VoidCallback onOpenReview;
   final ValueChanged<Meal> onEditMeal;
   final Future<void> Function(Meal meal) onDeleteMeal;
 
@@ -229,6 +238,22 @@ class _DashboardContent extends StatelessWidget {
           label: const Text(
             'Log Meal',
             style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+          ),
+        ),
+        const SizedBox(height: 16),
+        OutlinedButton.icon(
+          onPressed: onOpenReview,
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(50),
+            side: const BorderSide(color: AppColors.divider),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          icon: const Icon(Icons.calendar_month_rounded),
+          label: const Text(
+            'Open Review',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
           ),
         ),
         const SizedBox(height: 16),
@@ -761,4 +786,4 @@ class _MealCard extends StatelessWidget {
 
 enum _MealAction { edit, delete }
 
-enum _DashboardMenuAction { scoreInfo, history, weeklyReview, signOut }
+enum _DashboardMenuAction { scoreInfo, profile, review, weeklyReview, signOut }

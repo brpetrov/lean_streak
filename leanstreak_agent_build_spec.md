@@ -24,7 +24,7 @@ The product is a **low-friction habit + calorie consistency tracker** with:
 - daily scoring
 - daily category result
 - weekly overview
-- per-user stored history
+- per-user stored review data
 
 ---
 
@@ -83,7 +83,7 @@ Build only these features:
 - daily scoring system
 - daily category result
 - home/dashboard
-- history page
+- review screen
 - weekly overview page
 - profile page with editable user details
 
@@ -125,7 +125,7 @@ A complete v1 should let the user do the following:
 4. log meals using only calories + tags + meal type
 5. see total calories for today
 6. see today’s score and day category
-7. see previous daily results in history
+7. see previous daily results in review
 8. review how the last 7 days went
 9. update profile details if needed
 
@@ -211,7 +211,7 @@ Recommended structure:
 - `lib/features/onboarding/`
 - `lib/features/dashboard/`
 - `lib/features/meals/`
-- `lib/features/history/`
+- `lib/features/review/`
 - `lib/features/weekly_review/`
 - `lib/features/profile/`
 - `lib/shared/`
@@ -694,7 +694,7 @@ Must show:
 - today’s day category
 - score explanation summary
 - button to log meal
-- quick link to history
+- quick link to review
 - quick link to weekly review
 
 ## 13.5 Log meal screen / modal
@@ -707,16 +707,14 @@ Must show:
 - optional note
 - save button
 
-## 13.6 History screen
+## 13.6 Review screen
 
 Must show:
 
-- list of previous daily summaries
-- date
-- score
-- category
-- calories vs target
-- tap item to see more detail if needed
+- week and month options
+- calendar-style day grid
+- each day square can show a good icon, warning icon, or stay blank if no data
+- tap day to see more detail
 
 ## 13.7 Weekly review screen
 
@@ -813,7 +811,7 @@ lib/
       data/
       domain/
       presentation/
-    history/
+    review/
       presentation/
     weekly_review/
       domain/
@@ -1065,7 +1063,7 @@ Meal: {userInput}
 6. Show today’s category.
 7. Show score explanation.
 8. Add clear button to log meal.
-9. Add links to history and weekly review.
+9. Add links to review and weekly review.
 
 ### Acceptance criteria
 
@@ -1075,20 +1073,38 @@ Meal: {userInput}
 
 ---
 
-## Phase 9 — History page
+## Phase 9 — Review screen
 
 ### Tasks
 
-1. Build history list from daily summaries.
-2. Show date, score, category, and calories.
-3. Support loading older days.
-4. Add simple day detail view if needed.
+1. Replace the history list concept with a review screen.
+2. Add week and month options on the same screen.
+3. Build clickable calendar day cells from daily summaries.
+4. Show a clear visual state for good days, warning days, and blank days.
+5. Reuse a simple day detail view on tap.
 
 ### Acceptance criteria
 
-- previous days are visible
+- previous days are visible in calendar form
 - daily data is accurate
-- history is easy to scan
+- review is easy to scan
+
+---
+
+## Phase 9.5 CHANGES — Monthly review calendar
+
+### Tasks
+
+1. Build the month calendar layout for the review screen.
+2. Add month-to-month navigation.
+3. Keep empty days visible but blank when no data exists.
+4. Add a quick link to review from the dashboard.
+
+### Acceptance criteria
+
+- month review loads correctly
+- month navigation works
+- the dashboard can open review quickly
 
 ---
 
@@ -1220,7 +1236,7 @@ The agent should test these flows before considering the app complete.
 - meal saves correctly
 - day total updates correctly
 - tags save correctly
-- history reflects new data
+- review reflects new data
 
 ### Scoring
 
@@ -1268,3 +1284,14 @@ The app is considered complete for v1 only when all of the following are true:
 5. Do not turn the app into a nutrition database product.
 6. Do not overcomplicate the UI.
 7. The product wins by being easy, fast, and motivating.
+
+//THINGS TO CONSIDER !!!!!
+
+-SHOULD WE ALSO COUNT MACROS, Like protein, carbs,fats
+
+-ALSO SHOULD WE TRACK THE PROGRESS OF HTE USER weekly/monthly.
+LIKE ASK THEM FOR CHANGES? For example if they lost 2 kg that week is the formula the same or it needs recalculating?
+
+-Maybe after the end of each week, we should display a dialog with a form to the user showing them the review summary, asking them for any info or notes of how it went.. etc.. (or maybe something extra idk???)
+
+-WHAT ABOUT WORKOUTS ?? Can we do a simillar logging for workouts?
