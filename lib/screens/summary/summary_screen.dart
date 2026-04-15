@@ -8,14 +8,14 @@ import 'package:lean_streak/models/period_review.dart';
 import 'package:lean_streak/providers/period_review_provider.dart';
 import 'package:lean_streak/providers/review_provider.dart';
 
-class WeeklyReviewScreen extends ConsumerStatefulWidget {
-  const WeeklyReviewScreen({super.key});
+class SummaryScreen extends ConsumerStatefulWidget {
+  const SummaryScreen({super.key});
 
   @override
-  ConsumerState<WeeklyReviewScreen> createState() => _WeeklyReviewScreenState();
+  ConsumerState<SummaryScreen> createState() => _SummaryScreenState();
 }
 
-class _WeeklyReviewScreenState extends ConsumerState<WeeklyReviewScreen> {
+class _SummaryScreenState extends ConsumerState<SummaryScreen> {
   _SummaryMode _mode = _SummaryMode.week;
   DateTime? _selectedPeriodStart;
 

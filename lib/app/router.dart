@@ -10,7 +10,7 @@ import 'package:lean_streak/screens/dashboard/dashboard_screen.dart';
 import 'package:lean_streak/screens/onboarding/onboarding_screen.dart';
 import 'package:lean_streak/screens/profile/profile_screen.dart';
 import 'package:lean_streak/screens/review/review_screen.dart';
-import 'package:lean_streak/screens/weekly_review/weekly_review_screen.dart';
+import 'package:lean_streak/screens/summary/summary_screen.dart';
 import 'package:lean_streak/widgets/splash_screen.dart';
 
 // ---------------------------------------------------------------------------
@@ -24,7 +24,7 @@ class AppRoutes {
   static const dashboard = '/dashboard';
   static const logMeal = '/log-meal';
   static const review = '/review';
-  static const weeklyReview = '/weekly-review';
+  static const summary = '/summary';
   static const profile = '/profile';
 }
 
@@ -84,8 +84,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ReviewScreen(),
       ),
       GoRoute(
-        path: AppRoutes.weeklyReview,
-        builder: (context, state) => const WeeklyReviewScreen(),
+        path: AppRoutes.summary,
+        builder: (context, state) => const SummaryScreen(),
       ),
       GoRoute(
         path: AppRoutes.profile,

@@ -212,7 +212,7 @@ Recommended structure:
 - `lib/features/dashboard/`
 - `lib/features/meals/`
 - `lib/features/review/`
-- `lib/features/weekly_review/`
+- `lib/features/summary/`
 - `lib/features/profile/`
 - `lib/shared/`
 
@@ -813,7 +813,7 @@ lib/
       presentation/
     review/
       presentation/
-    weekly_review/
+    summary/
       domain/
       presentation/
     profile/

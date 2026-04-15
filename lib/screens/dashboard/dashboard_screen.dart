@@ -46,8 +46,8 @@ class DashboardScreen extends ConsumerWidget {
                   context.push(AppRoutes.profile);
                 case _DashboardMenuAction.review:
                   context.push(AppRoutes.review);
-                case _DashboardMenuAction.weeklyReview:
-                  context.push(AppRoutes.weeklyReview);
+                case _DashboardMenuAction.summary:
+                  context.push(AppRoutes.summary);
                 case _DashboardMenuAction.signOut:
                   if (authState.isLoading) return;
                   await ref.read(authControllerProvider.notifier).signOut();
@@ -67,7 +67,7 @@ class DashboardScreen extends ConsumerWidget {
                 child: Text('Review'),
               ),
               const PopupMenuItem(
-                value: _DashboardMenuAction.weeklyReview,
+                value: _DashboardMenuAction.summary,
                 child: Text('Summary'),
               ),
               PopupMenuItem(
@@ -786,4 +786,4 @@ class _MealCard extends StatelessWidget {
 
 enum _MealAction { edit, delete }
 
-enum _DashboardMenuAction { scoreInfo, profile, review, weeklyReview, signOut }
+enum _DashboardMenuAction { scoreInfo, profile, review, summary, signOut }
