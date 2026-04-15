@@ -68,7 +68,7 @@ class DashboardScreen extends ConsumerWidget {
               ),
               const PopupMenuItem(
                 value: _DashboardMenuAction.weeklyReview,
-                child: Text('Weekly Review'),
+                child: Text('Summary'),
               ),
               PopupMenuItem(
                 value: _DashboardMenuAction.signOut,
