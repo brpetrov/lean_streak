@@ -12,10 +12,8 @@ class LogMealController extends AsyncNotifier<void> {
 
   Future<void> submit({
     Meal? existingMeal,
-    required MealType mealType,
     required double calories,
     required List<MealTag> tags,
-    MealFeeling? afterMealFeeling,
     String? note,
   }) async {
     state = const AsyncLoading();
@@ -32,10 +30,8 @@ class LogMealController extends AsyncNotifier<void> {
         id: existingMeal?.id ?? docRef!.id,
         date: date,
         timestamp: existingMeal?.timestamp ?? now,
-        mealType: mealType,
         calories: calories,
         tags: tags,
-        afterMealFeeling: afterMealFeeling,
         note: (note?.trim().isEmpty ?? true) ? null : note!.trim(),
         createdAt: existingMeal?.createdAt ?? now,
         updatedAt: now,

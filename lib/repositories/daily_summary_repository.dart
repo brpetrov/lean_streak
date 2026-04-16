@@ -15,6 +15,10 @@ class DailySummaryRepository {
     await _dailySummaries(uid).doc(summary.date).set(summary.toFirestore());
   }
 
+  Future<void> deleteSummary(String uid, String date) async {
+    await _dailySummaries(uid).doc(date).delete();
+  }
+
   Future<List<DailySummary>> fetchSummariesPage(
     String uid, {
     String? startAfterDate,

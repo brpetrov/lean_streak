@@ -122,7 +122,7 @@ class _CheckInDialogState extends ConsumerState<_CheckInDialog> {
               _CheckInContextCard(
                 targetCalories: widget.availability.targetCalories,
                 loggedDays: review?.loggedDays ?? 0,
-                averageScore: review?.averageScore ?? 0,
+                greenDays: review?.greenDays ?? 0,
               ),
               const SizedBox(height: 16),
               _QuestionSection<CheckInWeightTrend>(
@@ -229,12 +229,12 @@ class _CheckInContextCard extends StatelessWidget {
   const _CheckInContextCard({
     required this.targetCalories,
     required this.loggedDays,
-    required this.averageScore,
+    required this.greenDays,
   });
 
   final int targetCalories;
   final int loggedDays;
-  final double averageScore;
+  final int greenDays;
 
   @override
   Widget build(BuildContext context) {
@@ -260,10 +260,8 @@ class _CheckInContextCard extends StatelessWidget {
           ),
           Expanded(
             child: _ContextMetric(
-              label: 'Average score',
-              value: averageScore == 0
-                  ? 'No data'
-                  : averageScore.toStringAsFixed(1),
+              label: 'On track days',
+              value: '$greenDays',
             ),
           ),
         ],

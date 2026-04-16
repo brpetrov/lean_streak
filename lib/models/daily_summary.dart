@@ -1,20 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum DailyCategory {
-  veryGood('very_good', 'Very good'),
-  good('good', 'Good'),
-  bad('bad', 'Bad'),
-  veryBad('very_bad', 'Very bad');
+enum DailyStatus {
+  green('green', 'On track'),
+  yellow('yellow', 'Close'),
+  red('red', 'Off track');
 
-  const DailyCategory(this.value, this.label);
+  const DailyStatus(this.value, this.label);
 
   final String value;
   final String label;
 
-  static DailyCategory fromString(String value) {
-    return DailyCategory.values.firstWhere((category) {
-      return category.value == value;
-    });
+  static DailyStatus fromString(String value) {
+    return DailyStatus.values.firstWhere((status) => status.value == value);
   }
 }
 
@@ -26,10 +23,7 @@ class DailySummary {
     required this.calorieDelta,
     required this.mealCount,
     required this.tagCounts,
-    required this.score,
-    required this.maxScore,
-    required this.category,
-    required this.explanation,
+    required this.status,
     required this.updatedAt,
   });
 
@@ -39,15 +33,15 @@ class DailySummary {
   final int calorieDelta;
   final int mealCount;
   final Map<String, int> tagCounts;
-  final int score;
-  final int maxScore;
-  final DailyCategory category;
-  final List<String> explanation;
+  final DailyStatus status;
   final DateTime updatedAt;
 
-  factory DailySummary.fromFirestore(
-    DocumentSnapshot<Map<String, dynamic>> doc,
-  ) {
+  double get deltaRatio {
+    if (targetCalories <= 0) return 0;
+    return calorieDelta.abs() / targetCalories;
+  }
+
+  factory DailySummary.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data()!;
 
     return DailySummary(
@@ -56,13 +50,9 @@ class DailySummary {
       targetCalories: (data['targetCalories'] as num).round(),
       calorieDelta: (data['calorieDelta'] as num).round(),
       mealCount: data['mealCount'] as int,
-      tagCounts: (data['tagCounts'] as Map<String, dynamic>).map((key, value) {
-        return MapEntry(key, (value as num).round());
-      }),
-      score: data['score'] as int,
-      maxScore: data['maxScore'] as int,
-      category: DailyCategory.fromString(data['category'] as String),
-      explanation: List<String>.from(data['explanation'] as List<dynamic>),
+      tagCounts: (data['tagCounts'] as Map<String, dynamic>? ?? const {})
+          .map((key, value) => MapEntry(key, (value as num).round())),
+      status: _statusFromFirestore(data),
       updatedAt: (data['updatedAt'] as Timestamp).toDate(),
     );
   }
@@ -75,11 +65,24 @@ class DailySummary {
       'calorieDelta': calorieDelta,
       'mealCount': mealCount,
       'tagCounts': tagCounts,
-      'score': score,
-      'maxScore': maxScore,
-      'category': category.value,
-      'explanation': explanation,
+      'status': status.value,
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
+  }
+
+  static DailyStatus _statusFromFirestore(Map<String, dynamic> data) {
+    final storedStatus = data['status'] as String?;
+    if (storedStatus != null) {
+      return DailyStatus.fromString(storedStatus);
+    }
+
+    final targetCalories = (data['targetCalories'] as num?)?.round() ?? 0;
+    final totalCalories = (data['totalCalories'] as num?)?.round() ?? 0;
+    if (targetCalories <= 0) return DailyStatus.red;
+
+    final ratio = (totalCalories - targetCalories).abs() / targetCalories;
+    if (ratio <= 0.10) return DailyStatus.green;
+    if (ratio <= 0.20) return DailyStatus.yellow;
+    return DailyStatus.red;
   }
 }

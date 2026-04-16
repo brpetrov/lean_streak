@@ -25,6 +25,22 @@ class CheckInRepository {
     return CheckIn.fromFirestore(snapshot);
   }
 
+  Future<List<CheckIn>> fetchCheckInsInRange(
+    String uid, {
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    final snapshot = await _checkIns(uid).orderBy('periodStart').get();
+
+    return snapshot.docs
+        .map(CheckIn.fromFirestore)
+        .where((checkIn) {
+          return !checkIn.periodStart.isBefore(startDate) &&
+              !checkIn.periodEnd.isAfter(endDate);
+        })
+        .toList();
+  }
+
   Stream<CheckIn?> watchCheckIn(String uid, String periodKey) {
     return _checkIns(uid).doc(periodKey).snapshots().map((snapshot) {
       if (!snapshot.exists || snapshot.data() == null) return null;

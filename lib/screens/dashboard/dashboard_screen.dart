@@ -5,19 +5,18 @@ import 'package:intl/intl.dart';
 
 import 'package:lean_streak/app/router.dart';
 import 'package:lean_streak/core/constants/app_colors.dart';
-import 'package:lean_streak/providers/check_in_controller.dart';
-import 'package:lean_streak/providers/check_in_state_provider.dart';
 import 'package:lean_streak/models/daily_summary.dart';
 import 'package:lean_streak/models/meal.dart';
 import 'package:lean_streak/models/user_profile.dart';
-import 'package:lean_streak/providers/auth_controller.dart';
 import 'package:lean_streak/providers/account_controller.dart';
+import 'package:lean_streak/providers/auth_controller.dart';
+import 'package:lean_streak/providers/check_in_controller.dart';
+import 'package:lean_streak/providers/check_in_state_provider.dart';
 import 'package:lean_streak/providers/daily_summary_provider.dart';
 import 'package:lean_streak/providers/log_meal_controller.dart';
 import 'package:lean_streak/providers/meal_provider.dart';
 import 'package:lean_streak/providers/user_profile_provider.dart';
 import 'package:lean_streak/screens/dashboard/helpers/check_in_dialog.dart';
-import 'package:lean_streak/screens/dashboard/helpers/score_info_dialog.dart';
 import 'package:lean_streak/screens/meals/log_meal_sheet.dart';
 import 'package:lean_streak/services/check_in_service.dart';
 import 'package:lean_streak/widgets/password_confirm_dialog.dart';
@@ -73,9 +72,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               content: const Text('A 2-week check-in is ready.'),
               action: SnackBarAction(
                 label: 'Open',
-                onPressed: () {
-                  _openCheckInFlow(context, availability);
-                },
+                onPressed: () => _openCheckInFlow(context, availability),
               ),
             ),
           );
@@ -95,10 +92,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ),
           PopupMenuButton<_DashboardMenuAction>(
             tooltip: 'More options',
-            onSelected: (_DashboardMenuAction action) async {
+            onSelected: (action) async {
               switch (action) {
-                case _DashboardMenuAction.scoreInfo:
-                  showScoreInfoDialog(context);
                 case _DashboardMenuAction.checkIn:
                   await _openCheckInFlow(
                     context,
@@ -120,10 +115,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: _DashboardMenuAction.scoreInfo,
-                child: Text('How scoring works'),
-              ),
               const PopupMenuItem(
                 value: _DashboardMenuAction.checkIn,
                 child: Text('Check-in'),
@@ -198,21 +189,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 profile: profile,
                 meals: meals,
                 summary: summary,
-                onOpenScoreInfo: () => showScoreInfoDialog(context),
                 onLogMeal: () => showLogMealSheet(context),
                 onOpenReview: () => context.push(AppRoutes.review),
-                onEditMeal: (meal) {
-                  showLogMealSheet(context, existingMeal: meal);
-                },
+                onEditMeal: (meal) =>
+                    showLogMealSheet(context, existingMeal: meal),
                 onDeleteMeal: (meal) async {
                   final confirmed = await showDialog<bool>(
                     context: context,
                     builder: (context) {
                       return AlertDialog(
                         title: const Text('Delete meal?'),
-                        content: Text(
-                          'Remove this ${meal.mealType.label.toLowerCase()} entry from today?',
-                        ),
+                        content: const Text('Remove this meal from today?'),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.of(context).pop(false),
@@ -233,9 +220,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   if (confirmed != true || !context.mounted) return;
 
                   try {
-                    await ref
-                        .read(logMealControllerProvider.notifier)
-                        .delete(meal);
+                    await ref.read(logMealControllerProvider.notifier).delete(meal);
                   } catch (_) {
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -291,15 +276,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     }
 
     final result = await showCheckInDialog(context, availability: availability);
-
     if (!context.mounted || result == null) return;
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Check-in saved.')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Check-in saved.')),
+    );
 
     if (result == CheckInDialogResult.savedAndOpenProfile) {
-      if (!context.mounted) return;
       context.push(AppRoutes.profile);
     }
   }
@@ -309,7 +292,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       context,
       title: 'Reset progress?',
       description:
-          'This deletes your meals, daily scores, check-ins, and AI usage. Your profile and login stay.',
+          'This deletes your meals, daily summaries, check-ins, and AI usage. Your profile and login stay.',
       confirmLabel: 'Reset',
       destructive: true,
     );
@@ -320,19 +303,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       await ref
           .read(accountControllerProvider.notifier)
           .resetProgress(password: password);
-
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Progress reset.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Progress reset.')),
+      );
     } catch (error) {
       if (!context.mounted) return;
       final message = error is AccountActionException
           ? error.message
           : 'Could not reset progress right now.';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
     }
   }
 }
@@ -343,7 +325,6 @@ class _DashboardContent extends StatelessWidget {
     required this.profile,
     required this.meals,
     required this.summary,
-    required this.onOpenScoreInfo,
     required this.onLogMeal,
     required this.onOpenReview,
     required this.onEditMeal,
@@ -354,7 +335,6 @@ class _DashboardContent extends StatelessWidget {
   final UserProfile profile;
   final List<Meal> meals;
   final DailySummary summary;
-  final VoidCallback onOpenScoreInfo;
   final VoidCallback onLogMeal;
   final VoidCallback onOpenReview;
   final ValueChanged<Meal> onEditMeal;
@@ -362,8 +342,10 @@ class _DashboardContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).padding.bottom + 32;
+
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomPadding),
       children: [
         _HeaderSection(date: date, name: profile.name),
         const SizedBox(height: 20),
@@ -401,7 +383,7 @@ class _DashboardContent extends StatelessWidget {
         const SizedBox(height: 16),
         _CalorieOverviewCard(summary: summary),
         const SizedBox(height: 16),
-        _ScoreCard(summary: summary, onOpenScoreInfo: onOpenScoreInfo),
+        _StatusCard(summary: summary),
         const SizedBox(height: 24),
         Row(
           children: [
@@ -436,7 +418,6 @@ class _DashboardContent extends StatelessWidget {
 
   List<Widget> _buildMealCards(List<Meal> meals) {
     final widgets = <Widget>[];
-
     for (var index = 0; index < meals.length; index++) {
       widgets.add(
         _MealCard(
@@ -445,12 +426,10 @@ class _DashboardContent extends StatelessWidget {
           onDelete: () => onDeleteMeal(meals[index]),
         ),
       );
-
       if (index < meals.length - 1) {
         widgets.add(const SizedBox(height: 12));
       }
     }
-
     return widgets;
   }
 }
@@ -483,15 +462,6 @@ class _HeaderSection extends StatelessWidget {
             fontSize: 30,
             fontWeight: FontWeight.w800,
             color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Your home screen shows today\'s calories, score, and what to improve next.',
-          style: TextStyle(
-            fontSize: 15,
-            color: AppColors.textSecondary,
-            height: 1.4,
           ),
         ),
       ],
@@ -576,20 +546,14 @@ class _CalorieOverviewCard extends StatelessWidget {
   }
 }
 
-class _ScoreCard extends StatelessWidget {
-  const _ScoreCard({required this.summary, required this.onOpenScoreInfo});
+class _StatusCard extends StatelessWidget {
+  const _StatusCard({required this.summary});
 
   final DailySummary summary;
-  final VoidCallback onOpenScoreInfo;
 
   @override
   Widget build(BuildContext context) {
-    final categoryColor = switch (summary.category) {
-      DailyCategory.veryGood => AppColors.veryGood,
-      DailyCategory.good => AppColors.good,
-      DailyCategory.bad => AppColors.bad,
-      DailyCategory.veryBad => AppColors.veryBad,
-    };
+    final color = _statusColor(summary.status);
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -611,7 +575,7 @@ class _ScoreCard extends StatelessWidget {
             children: [
               const Expanded(
                 child: Text(
-                  'Today\'s Score',
+                  'Today\'s Status',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -625,77 +589,25 @@ class _ScoreCard extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: categoryColor.withValues(alpha: 0.12),
+                  color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  summary.category.label,
-                  style: TextStyle(
-                    color: categoryColor,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  summary.status.label,
+                  style: TextStyle(color: color, fontWeight: FontWeight.w700),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              Text(
-                '${summary.score}/${summary.maxScore}',
-                style: const TextStyle(
-                  fontSize: 34,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: onOpenScoreInfo,
-                tooltip: 'How scoring works',
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(
-                  Icons.info_outline_rounded,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
+          Text(
+            _statusMessage(summary),
+            style: const TextStyle(
+              fontSize: 15,
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
           ),
-          const SizedBox(height: 6),
-          const Text(
-            'How today\'s result was built:',
-            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 14),
-          ...summary.explanation.map((item) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.only(top: 6),
-                    child: Icon(
-                      Icons.circle,
-                      size: 6,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      item,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textPrimary,
-                        height: 1.35,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
         ],
       ),
     );
@@ -767,7 +679,7 @@ class _EmptyMealsState extends StatelessWidget {
           ),
           SizedBox(height: 8),
           Text(
-            'Add your first meal to see calories, score, and category update automatically.',
+            'Add your first meal to see calories and day status update automatically.',
             style: TextStyle(
               fontSize: 14,
               color: AppColors.textSecondary,
@@ -812,17 +724,17 @@ class _MealCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      meal.mealType.label,
+                      time,
                       style: const TextStyle(
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      time,
-                      style: const TextStyle(
+                    const Text(
+                      'Logged meal',
+                      style: TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,
                       ),
@@ -848,10 +760,7 @@ class _MealCard extends StatelessWidget {
                 },
                 itemBuilder: (context) => const [
                   PopupMenuItem(value: _MealAction.edit, child: Text('Edit')),
-                  PopupMenuItem(
-                    value: _MealAction.delete,
-                    child: Text('Delete'),
-                  ),
+                  PopupMenuItem(value: _MealAction.delete, child: Text('Delete')),
                 ],
               ),
             ],
@@ -860,55 +769,33 @@ class _MealCard extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: [
-              ...meal.tags.map((tag) {
-                final color = tag.isPositive
-                    ? AppColors.tagPositive
-                    : AppColors.tagWarning;
-                final background = tag.isPositive
-                    ? AppColors.tagPositiveBg
-                    : AppColors.tagWarningBg;
+            children: meal.tags.map((tag) {
+              final color = tag.isPositive
+                  ? AppColors.tagPositive
+                  : AppColors.tagWarning;
+              final background = tag.isPositive
+                  ? AppColors.tagPositiveBg
+                  : AppColors.tagWarningBg;
 
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: background,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    tag.label,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: color,
-                    ),
-                  ),
-                );
-              }),
-              if (meal.afterMealFeeling != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceVariant,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: AppColors.divider),
-                  ),
-                  child: Text(
-                    meal.afterMealFeeling!.label,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
+              return Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: background,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  tag.label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: color,
                   ),
                 ),
-            ],
+              );
+            }).toList(),
           ),
           if (meal.note != null) ...[
             const SizedBox(height: 12),
@@ -929,11 +816,35 @@ class _MealCard extends StatelessWidget {
 enum _MealAction { edit, delete }
 
 enum _DashboardMenuAction {
-  scoreInfo,
   checkIn,
   profile,
   review,
   summary,
   resetProgress,
   signOut,
+}
+
+Color _statusColor(DailyStatus status) {
+  return switch (status) {
+    DailyStatus.green => AppColors.veryGood,
+    DailyStatus.yellow => AppColors.bad,
+    DailyStatus.red => AppColors.veryBad,
+  };
+}
+
+String _statusMessage(DailySummary summary) {
+  if (summary.mealCount == 0) {
+    return 'No meals logged yet.';
+  }
+  if (summary.status == DailyStatus.green) {
+    return 'You stayed within 10% of your calorie target today.';
+  }
+  if (summary.status == DailyStatus.yellow) {
+    return summary.calorieDelta > 0
+        ? 'You finished 10% to 20% above target today.'
+        : 'You finished 10% to 20% below target today.';
+  }
+  return summary.calorieDelta > 0
+      ? 'You finished more than 20% above target today.'
+      : 'You finished more than 20% below target today.';
 }

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import 'package:lean_streak/models/period_review.dart';
 import 'package:lean_streak/providers/auth_provider.dart';
+import 'package:lean_streak/providers/check_in_provider.dart';
 import 'package:lean_streak/providers/daily_summary_provider.dart';
 import 'package:lean_streak/services/period_review_service.dart';
 
@@ -35,12 +36,33 @@ final periodReviewProvider = FutureProvider.autoDispose
       }
 
       final formatter = DateFormat('yyyy-MM-dd');
+      final startDate = DateTime(
+        range.startDate.year,
+        range.startDate.month,
+        range.startDate.day,
+      );
+      final endDate = DateTime(
+        range.endDate.year,
+        range.endDate.month,
+        range.endDate.day,
+        23,
+        59,
+        59,
+        999,
+      );
       final summaries = await ref
           .watch(dailySummaryRepositoryProvider)
           .fetchSummariesInRange(
             uid,
-            startDate: formatter.format(range.startDate),
-            endDate: formatter.format(range.endDate),
+            startDate: formatter.format(startDate),
+            endDate: formatter.format(endDate),
+          );
+      final checkIns = await ref
+          .watch(checkInRepositoryProvider)
+          .fetchCheckInsInRange(
+            uid,
+            startDate: startDate,
+            endDate: endDate,
           );
 
       return ref
@@ -49,5 +71,6 @@ final periodReviewProvider = FutureProvider.autoDispose
             startDate: range.startDate,
             endDate: range.endDate,
             summaries: summaries,
+            checkIns: checkIns,
           );
     });

@@ -24,6 +24,11 @@ class DailySummaryService {
     }
 
     final meals = await _mealRepository.fetchMealsForDate(uid, date);
+    if (meals.isEmpty) {
+      await _dailySummaryRepository.deleteSummary(uid, date);
+      return;
+    }
+
     final summary = buildSummary(
       date: date,
       meals: meals,
@@ -40,103 +45,11 @@ class DailySummaryService {
   }) {
     final targetCalories = dailyCalorieTarget.round();
 
-    if (meals.isEmpty) {
-      return DailySummary(
-        date: date,
-        totalCalories: 0,
-        targetCalories: targetCalories,
-        calorieDelta: -targetCalories,
-        mealCount: 0,
-        tagCounts: const {},
-        score: 0,
-        maxScore: 10,
-        category: DailyCategory.veryBad,
-        explanation: const ['No meals logged'],
-        updatedAt: DateTime.now(),
-      );
-    }
-
     final totalCalories = meals.fold<int>(0, (sum, meal) {
       return sum + meal.calories.round();
     });
     final calorieDelta = totalCalories - targetCalories;
-    final calorieRatio = targetCalories == 0
-        ? 0.0
-        : totalCalories / targetCalories;
     final tagCounts = _buildTagCounts(meals);
-    final feelingCounts = _buildFeelingCounts(meals);
-    final explanation = <String>[];
-    var score = 5;
-
-    if ((calorieRatio - 1).abs() <= 0.05) {
-      score += 2;
-      explanation.add('Stayed close to calorie target');
-    } else if ((calorieRatio - 1).abs() <= 0.10) {
-      score += 1;
-      explanation.add('Stayed fairly close to calorie target');
-    } else if (calorieRatio > 1.10 && calorieRatio <= 1.20) {
-      score -= 1;
-      explanation.add('Went moderately above calorie target');
-    } else if (calorieRatio > 1.20) {
-      score -= 2;
-      explanation.add('Went well above calorie target');
-    } else if (calorieRatio >= 0.75 && calorieRatio < 0.90) {
-      score -= 1;
-      explanation.add('Finished the day below calorie target');
-    } else if (calorieRatio >= 0.50 && calorieRatio < 0.75) {
-      score -= 2;
-      explanation.add('Ate far below calorie target');
-    } else if (calorieRatio < 0.50) {
-      score -= 3;
-      explanation.add('Logged far too little for a full day');
-    } else {
-      explanation.add(
-        'Calories were off target, but not enough to change the score',
-      );
-    }
-
-    if (meals.length == 1) {
-      score -= 1;
-      explanation.add('Only one meal was logged, so the day looks incomplete');
-    }
-
-    if ((tagCounts[MealTag.highProtein.value] ?? 0) >= 1) {
-      score += 1;
-      explanation.add('Included at least one high protein meal');
-    }
-
-    if ((tagCounts[MealTag.balanced.value] ?? 0) >= 1) {
-      score += 1;
-      explanation.add('Included at least one balanced meal');
-    }
-
-    if ((tagCounts[MealTag.fruitVeg.value] ?? 0) >= 2) {
-      score += 1;
-      explanation.add('Included fruit and veg more than once');
-    }
-
-    if ((feelingCounts[MealFeeling.tooFull.value] ?? 0) >= 1 ||
-        (tagCounts[MealTag.overate.value] ?? 0) >= 1) {
-      score -= 2;
-      explanation.add('One or more meals left you too full');
-    }
-
-    if ((tagCounts[MealTag.sugary.value] ?? 0) >= 1) {
-      score -= 1;
-      explanation.add('High sugar showed up in the day');
-    }
-
-    if ((tagCounts[MealTag.fried.value] ?? 0) >= 1) {
-      score -= 1;
-      explanation.add('Fried food showed up in the day');
-    }
-
-    if ((tagCounts[MealTag.processed.value] ?? 0) >= 1) {
-      score -= 1;
-      explanation.add('Highly processed food showed up in the day');
-    }
-
-    final clampedScore = score.clamp(0, 10);
 
     return DailySummary(
       date: date,
@@ -145,10 +58,10 @@ class DailySummaryService {
       calorieDelta: calorieDelta,
       mealCount: meals.length,
       tagCounts: tagCounts,
-      score: clampedScore,
-      maxScore: 10,
-      category: _categoryForScore(clampedScore),
-      explanation: explanation,
+      status: _statusForCalories(
+        totalCalories: totalCalories,
+        targetCalories: targetCalories,
+      ),
       updatedAt: DateTime.now(),
     );
   }
@@ -165,22 +78,15 @@ class DailySummaryService {
     return counts;
   }
 
-  Map<String, int> _buildFeelingCounts(List<Meal> meals) {
-    final counts = <String, int>{};
+  DailyStatus _statusForCalories({
+    required int totalCalories,
+    required int targetCalories,
+  }) {
+    if (targetCalories <= 0) return DailyStatus.red;
 
-    for (final meal in meals) {
-      final feeling = meal.afterMealFeeling;
-      if (feeling == null) continue;
-      counts[feeling.value] = (counts[feeling.value] ?? 0) + 1;
-    }
-
-    return counts;
-  }
-
-  DailyCategory _categoryForScore(int score) {
-    if (score >= 8) return DailyCategory.veryGood;
-    if (score >= 6) return DailyCategory.good;
-    if (score >= 3) return DailyCategory.bad;
-    return DailyCategory.veryBad;
+    final ratio = (totalCalories - targetCalories).abs() / targetCalories;
+    if (ratio <= 0.10) return DailyStatus.green;
+    if (ratio <= 0.20) return DailyStatus.yellow;
+    return DailyStatus.red;
   }
 }
