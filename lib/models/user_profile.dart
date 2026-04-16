@@ -33,7 +33,8 @@ enum ActivityLevel {
 enum WeightLossPace {
   slow('slow'),
   moderate('moderate'),
-  fast('fast');
+  fast('fast'),
+  maintain('maintain');
 
   const WeightLossPace(this.value);
   final String value;

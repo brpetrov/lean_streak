@@ -6,8 +6,10 @@ import 'package:intl/intl.dart';
 import 'package:lean_streak/core/constants/app_colors.dart';
 import 'package:lean_streak/helpers/health_calculator.dart';
 import 'package:lean_streak/models/user_profile.dart';
+import 'package:lean_streak/providers/account_controller.dart';
 import 'package:lean_streak/providers/profile_controller.dart';
 import 'package:lean_streak/providers/user_profile_provider.dart';
+import 'package:lean_streak/widgets/password_confirm_dialog.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -132,10 +134,36 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> _confirmAndDeleteAccount() async {
+    final password = await showPasswordConfirmDialog(
+      context,
+      title: 'Delete account?',
+      description:
+          'This deletes your profile, all logged data, and your login. This cannot be undone.',
+      confirmLabel: 'Delete account',
+      destructive: true,
+    );
+
+    if (password == null || !mounted) return;
+
+    try {
+      await ref
+          .read(accountControllerProvider.notifier)
+          .deleteAccount(password: password);
+    } catch (error) {
+      if (!mounted) return;
+      final message = error is AccountActionException
+          ? error.message
+          : 'Could not delete your account right now.';
+      _showSnack(message);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(userProfileProvider);
     final isSaving = ref.watch(profileControllerProvider).isLoading;
+    final isDeleting = ref.watch(accountControllerProvider).isLoading;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -383,7 +411,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     SizedBox(
                       height: 52,
                       child: ElevatedButton(
-                        onPressed: isSaving ? null : () => _submit(profile),
+                        onPressed: isSaving || isDeleting
+                            ? null
+                            : () => _submit(profile),
                         child: isSaving
                             ? const SizedBox(
                                 width: 22,
@@ -401,6 +431,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 ),
                               ),
                       ),
+                    ),
+                    const SizedBox(height: 16),
+                    OutlinedButton(
+                      onPressed: isSaving || isDeleting
+                          ? null
+                          : _confirmAndDeleteAccount,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                        side: const BorderSide(color: AppColors.error),
+                        foregroundColor: AppColors.error,
+                      ),
+                      child: isDeleting
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: AppColors.error,
+                              ),
+                            )
+                          : const Text(
+                              'Delete Account',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
                   ],
                 ),
@@ -555,6 +612,7 @@ class _PaceCard extends StatelessWidget {
     WeightLossPace.slow => 'Slow - 0.5 kg/week',
     WeightLossPace.moderate => 'Moderate - 0.75 kg/week',
     WeightLossPace.fast => 'Fast - 1.0 kg/week',
+    WeightLossPace.maintain => 'Maintain weight',
   };
 
   static String _description(WeightLossPace pace) => switch (pace) {
@@ -564,12 +622,15 @@ class _PaceCard extends StatelessWidget {
       'Best balance of speed and sustainability for most people.',
     WeightLossPace.fast =>
       'Faster results, but requires more consistency and restriction.',
+    WeightLossPace.maintain =>
+      'Keeps your calories around maintenance instead of creating a deficit.',
   };
 
   static IconData _icon(WeightLossPace pace) => switch (pace) {
     WeightLossPace.slow => Icons.hourglass_bottom_rounded,
     WeightLossPace.moderate => Icons.trending_down_rounded,
     WeightLossPace.fast => Icons.bolt_rounded,
+    WeightLossPace.maintain => Icons.horizontal_rule_rounded,
   };
 
   @override

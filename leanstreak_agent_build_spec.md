@@ -23,7 +23,7 @@ The product is a **low-friction habit + calorie consistency tracker** with:
 - quick meal logging
 - daily scoring
 - daily category result
-- weekly overview
+- summary page
 - per-user stored review data
 
 ---
@@ -62,7 +62,7 @@ The app should feel:
 
 Meal logging must be fast.
 The home screen must be understandable in seconds.
-Weekly review must be simple and useful.
+Review and summary must be simple and useful.
 
 ---
 
@@ -84,7 +84,7 @@ Build only these features:
 - daily category result
 - home/dashboard
 - review screen
-- weekly overview page
+- summary page
 - profile page with editable user details
 
 ## 3.2 Optional if very easy
@@ -126,7 +126,7 @@ A complete v1 should let the user do the following:
 5. see total calories for today
 6. see today’s score and day category
 7. see previous daily results in review
-8. review how the last 7 days went
+8. review completed week and month summaries
 9. update profile details if needed
 
 ---
@@ -153,13 +153,14 @@ Collect:
 - current weight (kg)
 - activity level (Light / Medium / Hard)
 - target weight (kg)
-- target date
+- weight loss pace
 
 After submit:
 
 - validate input
 - calculate BMI
 - calculate calorie target
+- derive target date from the chosen pace
 - validate whether the goal pace is realistic
 - save user profile to Firestore
 - mark onboarding complete
@@ -177,10 +178,12 @@ After submit:
 - Dashboard updates automatically.
 - Day score and category update automatically.
 
-### 5.4 Weekly use flow
+### 5.4 Review and summary flow
 
-- User opens weekly overview page.
-- Sees the last 7 days summary.
+- User opens review screen.
+- Sees previous days in week or month calendar form.
+- User opens summary page.
+- Sees the latest completed week or month summary.
 - Sees average score, total logged calories, day categories, top patterns, and short guidance.
 
 ---
@@ -199,7 +202,7 @@ These decisions should be followed unless there is a strong technical reason not
 
 ### 6.2 Suggested architecture
 
-Use **clean, simple feature-first architecture**.
+Use **clean, simple type-first architecture**.
 Do not overengineer.
 Avoid unnecessary abstraction.
 
@@ -207,14 +210,13 @@ Recommended structure:
 
 - `lib/app/`
 - `lib/core/`
-- `lib/features/auth/`
-- `lib/features/onboarding/`
-- `lib/features/dashboard/`
-- `lib/features/meals/`
-- `lib/features/review/`
-- `lib/features/summary/`
-- `lib/features/profile/`
-- `lib/shared/`
+- `lib/screens/`
+- `lib/models/`
+- `lib/providers/`
+- `lib/repositories/`
+- `lib/services/`
+- `lib/helpers/`
+- `lib/widgets/`
 
 ### 6.3 State management
 
@@ -281,6 +283,7 @@ Path: `users/{uid}`
   "currentWeightKg": 77,
   "targetWeightKg": 72,
   "activityLevel": "light|medium|hard",
+  "weightLossPace": "slow|moderate|fast",
   "targetDate": "timestamp",
   "bmi": 24.3,
   "bmr": 1712,
@@ -305,7 +308,8 @@ Path: `users/{uid}/meals/{mealId}`
   "timestamp": "timestamp",
   "mealType": "breakfast|lunch|dinner|snack",
   "calories": 650,
-  "tags": ["high_protein", "balanced", "home_cooked"],
+  "tags": ["high_protein", "balanced", "fruit_veg"],
+  "afterMealFeeling": "satisfied|still_hungry|too_full",
   "note": "optional string",
   "createdAt": "timestamp",
   "updatedAt": "timestamp"
@@ -412,11 +416,19 @@ TDEE = BMR * activityMultiplier
 
 ## 9.5 Goal pace logic
 
-Calculate:
+The app uses a pace choice instead of a manual target date picker.
+
+Map the selected pace to:
+
+- `slow` -> `0.50 kg/week`
+- `moderate` -> `0.75 kg/week`
+- `fast` -> `1.00 kg/week`
+
+Then calculate:
 
 - `totalKgToLose = currentWeightKg - targetWeightKg`
-- `daysToTarget = targetDate - today`
-- `weeklyRequiredLoss = totalKgToLose / (daysToTarget / 7)`
+- `daysNeeded = (totalKgToLose / paceKgPerWeek) * 7`
+- `targetDate = today + daysNeeded`
 
 Use these rules:
 
@@ -434,12 +446,12 @@ Use the common approximation:
 
 Then:
 
-- calculate required total calorie deficit
-- divide by days to target
+- convert the selected pace to a daily deficit
+- use `paceKgPerWeek * 1100`
 - subtract from TDEE
 
 ```text
-dailyCalorieTarget = TDEE - requiredDailyDeficit
+dailyCalorieTarget = TDEE - (paceKgPerWeek * 1100)
 ```
 
 ### Safety floor
@@ -478,6 +490,7 @@ Every meal log must include:
 
 Optional field:
 
+- after meal feeling
 - note
 
 ## 10.3 Meal tags
@@ -490,19 +503,26 @@ Do not let users create custom tags in v1.
 - balanced
 - high_protein
 - fruit_veg
-- home_cooked
-- filling
 
 ### Warning tags
 
-- processed
 - sugary
 - fried
-- alcohol
-- overate
+- processed
 
 Keep labels user-friendly in UI.
 Store values in normalized lowercase snake_case.
+
+## 10.4 After meal feeling
+
+Use a short fixed list:
+
+- satisfied
+- still_hungry
+- too_full
+
+This is separate from the meal tags.
+It should stay optional in v1.
 
 ---
 
@@ -519,7 +539,7 @@ The scoring system should:
 - reward staying near calorie target
 - reward better meal quality
 - reward protein and balanced choices
-- penalize obvious overeating patterns
+- penalize obvious unhealthy patterns
 - stay understandable
 - not be perfect nutrition science
 
@@ -544,7 +564,9 @@ Compare `totalCalories` vs `dailyCalorieTarget`.
 - within target ± 10% -> `+1`
 - above target by 10% to 20% -> `-1`
 - above target by more than 20% -> `-2`
-- below target by more than 25% -> `-1`
+- 10% to 25% below target -> `-1`
+- 25% to 50% below target -> `-2`
+- more than 50% below target -> `-3`
 
 ### Positive tag points
 
@@ -558,15 +580,15 @@ Add:
 
 Subtract:
 
-- `overate` tag present -> `-2`
-- 2 or more `processed` tags in the day -> `-1`
-- 2 or more `sugary` tags in the day -> `-1`
-- `alcohol` and `overate` both present same day -> additional `-1`
+- any `too_full` feeling in the day -> `-2`
+- any `processed` tag in the day -> `-1`
+- any `sugary` tag in the day -> `-1`
+- any `fried` tag in the day -> `-1`
 
 ### Logging completeness rule
 
 - if no meals logged for the day -> category `very_bad`, score `0`, explanation `No meals logged`
-- if only 1 meal logged -> no bonus or penalty, keep normal scoring
+- if only 1 meal logged -> `-1`
 
 ## 11.3 Daily category mapping
 
@@ -584,19 +606,19 @@ Example:
 
 - `Stayed close to calorie target`
 - `Included at least one high protein meal`
-- `Had an overeating meal`
+- `One or more meals left you too full`
 
 The UI must show this clearly.
 The user should never wonder why the day received its result.
 
 ---
 
-## 12. Weekly review logic
+## 12. Summary logic
 
-The weekly review is a key feature.
-It should summarize the last 7 days and give short guidance.
+The summary page is a key feature.
+It should summarize completed periods and give short guidance.
 
-## 12.1 Weekly review content
+## 12.1 Summary content
 
 Show:
 
@@ -604,14 +626,14 @@ Show:
 - best day
 - worst day
 - number of very good / good / bad / very bad days
-- total logged calories for the week
+- total logged calories for the selected period
 - average calories per day
 - total meals logged
 - most frequent positive tags
 - most frequent warning tags
 - short guidance section
 
-## 12.2 Weekly guidance rules
+## 12.2 Summary guidance rules
 
 Generate simple rule-based feedback.
 Do not use AI summaries in v1.
@@ -620,36 +642,37 @@ Do not use AI summaries in v1.
 
 If average score >= 8:
 
-- `Excellent week. Keep repeating what worked.`
+- `Excellent period. Keep repeating what worked.`
 
 If average score between 6 and 7.99:
 
-- `Solid week. Focus on reducing a few off-track meals.`
+- `Solid period. Focus on reducing a few off-track meals.`
 
 If average score < 6:
 
-- `This week had some struggles. Focus on staying closer to your calorie target and reducing overeating meals.`
+- `This period had some struggles. Focus on staying closer to your calorie target and reducing meals that leave you too full.`
 
 If `high_protein` appears often:
 
 - `Protein choices are helping. Keep that up.`
 
-If `overate` appears 2+ times:
+If `too_full` appears 2+ times:
 
-- `Overeating happened multiple times this week. Focus on portion control and more filling meals.`
+- `You ended up too full multiple times. Focus on portion control and more balanced meals.`
 
 If `processed` or `sugary` tags are high:
 
-- `Try replacing some processed or sugary meals with more balanced options.`
+- `Try replacing some highly processed or high sugar meals with more balanced options.`
 
 If meals were logged on fewer than 4 days:
 
-- `Logging was inconsistent this week. Better logging will make the score more useful.`
+- `Logging was inconsistent in this period. Better logging will make the score more useful.`
 
-## 12.3 Weekly range
+## 12.3 Summary range
 
-Use a rolling last 7 days window.
-Do not depend on calendar month logic.
+Week mode uses the last completed Monday to Sunday block with data.
+Month mode uses completed calendar months with data.
+Do not use the current incomplete week or current incomplete month.
 
 ---
 
@@ -695,15 +718,17 @@ Must show:
 - score explanation summary
 - button to log meal
 - quick link to review
-- quick link to weekly review
+- quick link to summary
 
 ## 13.5 Log meal screen / modal
 
 Must show:
 
+- AI or manual calorie entry mode
 - calories input
 - meal type selector
 - tag multi-select
+- optional after meal feeling
 - optional note
 - save button
 
@@ -716,14 +741,14 @@ Must show:
 - each day square can show a good icon, warning icon, or stay blank if no data
 - tap day to see more detail
 
-## 13.7 Weekly review screen
+## 13.7 Summary screen
 
 Must show:
 
-- last 7 days summary
+- completed week and month options
 - average score
 - category counts
-- weekly guidance
+- guidance
 - top helpful tags
 - top risky tags
 
@@ -735,7 +760,6 @@ Must show:
 - edit profile
 - save changes
 - recalculate bmi/tdee/target when relevant fields change
-- sign out
 
 ---
 
@@ -780,7 +804,7 @@ Examples of good app copy:
 
 ## 15. Suggested folder structure
 
-Use a simple feature-first structure similar to this:
+Use a simple type-first structure similar to this:
 
 ```text
 lib/
@@ -790,35 +814,20 @@ lib/
   core/
     constants/
     theme/
-    utils/
-    services/
-  shared/
-    widgets/
-    models/
-  features/
+  helpers/
+  models/
+  providers/
+  repositories/
+  screens/
     auth/
-      data/
-      presentation/
     onboarding/
-      data/
-      domain/
-      presentation/
     dashboard/
-      data/
-      domain/
-      presentation/
     meals/
-      data/
-      domain/
-      presentation/
     review/
-      presentation/
     summary/
-      domain/
-      presentation/
     profile/
-      data/
-      presentation/
+  services/
+  widgets/
 ```
 
 Keep the structure practical.
@@ -903,7 +912,7 @@ the login screen just do the standard either biometric or rembmer of previous lo
 1. Build onboarding form.
 2. Add validation for all fields.
 3. Add activity level explanations.
-4. Add target date picker.
+4. Add weight loss pace selection with derived target date preview.
 5. Add realistic goal pace warning state.
 6. Save completed onboarding data.
 
@@ -942,7 +951,7 @@ the login screen just do the standard either biometric or rembmer of previous lo
 ### Overview
 
 Users often do not know how many calories a meal contains.
-This phase adds a lightweight AI estimation button inside the meal logging flow.
+This phase adds a lightweight AI estimation flow inside the meal logging form.
 The user describes their meal in plain language and the app returns a calorie estimate instantly.
 
 No food database is used. Natural language descriptions ("a big bowl of pasta with tomato sauce",
@@ -968,12 +977,12 @@ This keeps the free Gemini tier well within limits even across many users, and i
 2. Store the Gemini API key in `lib/core/config/api_keys.dart` (add to `.gitignore`).
 3. Create `AiUsageRepository` — reads and increments the daily count in Firestore.
 4. Create `CalorieEstimateService` — checks usage limit, calls Gemini, parses response, increments count.
-5. Add an "Estimate with AI" button below the calorie input in `log_meal_sheet.dart`.
-6. Tapping it reveals an inline description field. User types their meal and taps **"Estimate"**.
-7. Show a loading indicator, then display the result card with kcal + one-line note.
-8. **"Use this"** pre-fills the calorie input (still editable).
-9. Show remaining estimates for the day (e.g. "7 of 10 remaining").
-10. When limit is reached, disable the button and show "Daily limit reached — resets tomorrow".
+5. Add an input mode switch in `log_meal_sheet.dart`: **Estimate with AI** or **Enter calories**.
+6. Default new meal logs to **Estimate with AI**.
+7. In AI mode, show a description field. User types their meal and taps **"Estimate"**.
+8. Show a loading indicator, then display the result card with kcal + one-line note.
+9. **"Use this"** fills the calorie value, which remains editable.
+10. Show remaining estimates for the day and disable AI mode when the daily limit is reached.
 
 ### Prompt design
 
@@ -987,20 +996,20 @@ Meal: {userInput}
 
 ### UX flow
 
-1. User is on the log meal sheet, calorie field is empty (or they are unsure).
-2. They tap **"Not sure? Estimate with AI"** (shows remaining count e.g. "7 of 10 left today").
-3. A small text field expands inline. User types their meal description and taps **"Estimate"**.
+1. User opens the log meal sheet.
+2. The default mode is **Estimate with AI**. A manual **Enter calories** mode is also available.
+3. In AI mode, the user types their meal description and taps **"Estimate"**.
 4. Loading spinner shown, then result card appears:
    > **~480 kcal** — Typical grilled chicken wrap with lettuce and sauce.
 5. **"Use this"** fills the calorie input. User can adjust before saving.
-6. If the daily limit is hit, button shows "Daily limit reached — resets tomorrow" and is disabled.
+6. If the daily limit is hit, AI mode shows "Daily limit reached — resets tomorrow" and the user can switch to manual calories.
 7. If the API fails, show a short error and let the user type calories manually.
 
 ### Acceptance criteria
 
 - Estimate returns a reasonable kcal number for common meal descriptions
 - Daily usage is tracked correctly and resets each day
-- Button is disabled when limit is reached with a clear message
+- AI mode is unavailable when limit is reached with a clear message
 - Remaining count is visible to the user
 - Result pre-fills the calorie input correctly
 - API key is not committed to git
@@ -1018,8 +1027,9 @@ Meal: {userInput}
 4. Add meal type selector.
 5. Add calorie input.
 6. Add tag multi-select.
-7. Save meals to Firestore.
-8. Support editing and deleting meals only if easy; otherwise skip for v1.
+7. Add optional after meal feeling input.
+8. Save meals to Firestore.
+9. Support editing and deleting meals only if easy; otherwise skip for v1.
 
 ### Acceptance criteria
 
@@ -1063,7 +1073,7 @@ Meal: {userInput}
 6. Show today’s category.
 7. Show score explanation.
 8. Add clear button to log meal.
-9. Add links to review and weekly review.
+9. Add links to review and summary.
 
 ### Acceptance criteria
 
@@ -1108,22 +1118,22 @@ Meal: {userInput}
 
 ---
 
-## Phase 10 — Weekly review
+## Phase 10 — Summary
 
 ### Tasks
 
-1. Read last 7 daily summaries.
-2. Calculate weekly stats.
-3. Build weekly review UI.
+1. Read daily summaries for completed week and month periods.
+2. Calculate period stats.
+3. Build summary UI.
 4. Add rule-based guidance text.
 5. Highlight best and worst day.
 6. Show common tag patterns.
 
 ### Acceptance criteria
 
-- weekly review shows last 7 days correctly
+- summary shows completed week and month periods correctly
 - average score is correct
-- guidance matches weekly data
+- guidance matches period data
 - page feels useful, not noisy
 
 ---
@@ -1136,13 +1146,11 @@ Meal: {userInput}
 2. Allow editing of user profile fields.
 3. Recalculate BMI/BMR/TDEE/target when relevant fields change.
 4. Save updated profile.
-5. Add sign out.
 
 ### Acceptance criteria
 
 - user can update profile
 - recalculated values save correctly
-- user can sign out safely
 
 ---
 
@@ -1179,9 +1187,10 @@ Whenever a meal is added, updated, or deleted:
 
 This is simpler and safer than incremental partial updates in v1.
 
-## 17.2 Weekly review update strategy
+## 17.2 Summary update strategy
 
-For v1, calculate weekly review on demand from the last 7 daily summaries.
+For v1, calculate summary data on demand from daily summaries.
+Support completed week and completed month periods.
 Do **not** build background summary caching unless needed.
 
 ## 17.3 Date handling
@@ -1227,7 +1236,7 @@ The agent should test these flows before considering the app complete.
 ### Onboarding
 
 - all fields validate correctly
-- target date in the past is rejected
+- target date preview updates from the selected pace
 - target weight above current weight is handled clearly
 - calorie target is computed correctly
 
@@ -1241,13 +1250,13 @@ The agent should test these flows before considering the app complete.
 ### Scoring
 
 - day near target scores better than day far above target
-- overeating penalizes score
+- too full meals penalize score
 - high protein and balanced meals improve score
 - no meals logged gives very_bad and score 0
 
-### Weekly review
+### Summary
 
-- 7 day averages are correct
+- completed week and month averages are correct
 - category counts are correct
 - guidance changes based on patterns
 
@@ -1269,7 +1278,7 @@ The app is considered complete for v1 only when all of the following are true:
 - meals can be logged quickly
 - daily summaries are generated correctly
 - daily score and category are visible and understandable
-- weekly review works and gives useful guidance
+- summary works and gives useful guidance
 - data is stored per user in Firebase
 - the UI is simple, clean, and not cluttered
 
@@ -1287,11 +1296,95 @@ The app is considered complete for v1 only when all of the following are true:
 
 //THINGS TO CONSIDER !!!!!
 
--SHOULD WE ALSO COUNT MACROS, Like protein, carbs,fats
+The notes below are future roadmap items, not part of v1 done.
+Keep the same product rule: simple, fast, useful, and not a full nutrition database.
 
--ALSO SHOULD WE TRACK THE PROGRESS OF HTE USER weekly/monthly.
-LIKE ASK THEM FOR CHANGES? For example if they lost 2 kg that week is the formula the same or it needs recalculating?
+## Phase 13 - 2-week update prompt and check-in dialog
 
--Maybe after the end of each week, we should display a dialog with a form to the user showing them the review summary, asking them for any info or notes of how it went.. etc.. (or maybe something extra idk???)
+### Goal
 
--WHAT ABOUT WORKOUTS ?? Can we do a simillar logging for workouts?
+Add a lightweight update flow that nudges the user to reflect every 2 weeks and helps them decide whether anything should change.
+
+### Product rules
+
+- Keep the flow short and useful.
+- Do not make it feel like homework.
+- Recommendations should guide the user, not change anything automatically.
+- The update should help the user think, not judge them.
+
+### Tasks
+
+1. Add a lightweight check-in system that becomes available once every 2 weeks.
+2. Track whether the current 2-week check-in has already been shown or completed.
+3. When a new check-in is available, show a snackbar on the home screen with an action to open the dialog.
+4. Add the same `Check-in` entry to the dashboard context menu so the flow is always reachable manually.
+5. Create a check-in dialog that:
+   - shows useful current context first
+   - asks a short set of helpful questions
+   - can optionally let the user update their current weight
+   - can recommend whether the user should keep things as they are or update something
+6. Save the check-in result under the authenticated user with a clear period key.
+7. Add simple recommendation logic based on the user's answers and current data.
+8. If the user chooses to update their weight or related details, route them into the appropriate edit flow rather than auto-applying changes.
+
+### Suggested check-in questions
+
+- How has your weight changed recently?
+- How difficult does your calorie target feel?
+- How has your hunger been?
+- Do you want to update your current weight?
+- Do you think your current plan still fits you?
+
+### Recommendation rules
+
+- If things feel manageable and progress seems fine, recommend staying on the current plan.
+- If progress feels off and the plan feels hard, recommend updating current weight and reviewing targets.
+- If hunger is high and the plan feels aggressive, recommend reviewing pace or calorie target.
+- Never auto-apply any recommendation without user confirmation.
+
+### Acceptance criteria
+
+- 2-week check-in prompt appears at the right time and is not shown repeatedly in the same period
+- check-in is accessible both from the snackbar and the context menu
+- check-in results are stored under the correct user
+- the dialog feels short, useful, and not intrusive
+- recommendations are clear and non-judgmental
+- any actual updates remain user-controlled
+
+---
+
+## Phase 14 - Monthly review
+
+### Goal
+
+Give the user a clear monthly snapshot of how things went, focused on patterns and results rather than judgment.
+
+### Product rules
+
+- Keep it factual and calm.
+- Show useful data, not lectures.
+- If there is no data, keep the state simple and empty.
+
+### Tasks
+
+1. Build a monthly review view for the last completed month.
+2. Allow navigation between completed months that have data.
+3. Summarize the month using existing daily summaries and any saved check-in data.
+4. Show useful monthly information such as:
+   - average score
+   - number of logged days
+   - calorie consistency
+   - common healthy tags
+   - common unhealthy tags
+   - best and worst days
+   - check-in outcomes if available
+5. Keep the language neutral and non-judgmental.
+6. Allow the user to open day details from the month where useful.
+
+### Acceptance criteria
+
+- monthly review shows useful factual results without judgmental language
+- month-to-month navigation works for completed months with data
+- the user can understand how the month went at a glance
+- empty months do not create confusing states
+

@@ -18,7 +18,7 @@ class ProfileController extends AsyncNotifier<void> {
     required Gender gender,
     required double heightCm,
     required double currentWeightKg,
-    required double targetWeightKg,
+    required double? targetWeightKg,
     required ActivityLevel activityLevel,
     required WeightLossPace weightLossPace,
   }) async {
@@ -28,24 +28,31 @@ class ProfileController extends AsyncNotifier<void> {
       final uid = ref.read(currentUidProvider);
       if (uid == null) throw Exception('Not authenticated');
 
-      final pace = HealthCalculator.goalPaceFromWeightLossPace(weightLossPace);
-      final targetDate = HealthCalculator.targetDateFromWeightLossPace(
-        currentWeightKg,
-        targetWeightKg,
-        weightLossPace,
-      );
       final bmi = HealthCalculator.bmi(currentWeightKg, heightCm);
       final bmr = HealthCalculator.bmr(currentWeightKg, heightCm, age, gender);
       final tdee = HealthCalculator.tdee(bmr, activityLevel);
-      final paceLevel = HealthCalculator.goalPaceLevel(pace);
-      final (
-        :calories,
-        clamped: _,
-      ) = HealthCalculator.dailyCalorieTargetFromPace(
-        tdee: tdee,
-        paceKgPerWeek: pace,
-        gender: gender,
-      );
+      final isMaintaining = weightLossPace == WeightLossPace.maintain;
+      final resolvedTargetWeight = isMaintaining
+          ? currentWeightKg
+          : (targetWeightKg ?? currentWeightKg);
+      final pace = HealthCalculator.goalPaceFromWeightLossPace(weightLossPace);
+      final targetDate = isMaintaining
+          ? DateTime.now()
+          : HealthCalculator.targetDateFromWeightLossPace(
+              currentWeightKg,
+              resolvedTargetWeight,
+              weightLossPace,
+            );
+      final paceLevel = isMaintaining
+          ? GoalPaceLevel.safe
+          : HealthCalculator.goalPaceLevel(pace);
+      final calories = isMaintaining
+          ? HealthCalculator.maintenanceCalories(tdee)
+          : HealthCalculator.dailyCalorieTargetFromPace(
+              tdee: tdee,
+              paceKgPerWeek: pace,
+              gender: gender,
+            ).calories;
 
       final updatedProfile = currentProfile.copyWith(
         name: name.trim(),
@@ -53,7 +60,7 @@ class ProfileController extends AsyncNotifier<void> {
         gender: gender,
         heightCm: heightCm,
         currentWeightKg: currentWeightKg,
-        targetWeightKg: targetWeightKg,
+        targetWeightKg: resolvedTargetWeight,
         activityLevel: activityLevel,
         weightLossPace: weightLossPace,
         targetDate: targetDate,

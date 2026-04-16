@@ -5,26 +5,83 @@ import 'package:intl/intl.dart';
 
 import 'package:lean_streak/app/router.dart';
 import 'package:lean_streak/core/constants/app_colors.dart';
+import 'package:lean_streak/providers/check_in_controller.dart';
+import 'package:lean_streak/providers/check_in_state_provider.dart';
 import 'package:lean_streak/models/daily_summary.dart';
 import 'package:lean_streak/models/meal.dart';
 import 'package:lean_streak/models/user_profile.dart';
 import 'package:lean_streak/providers/auth_controller.dart';
+import 'package:lean_streak/providers/account_controller.dart';
 import 'package:lean_streak/providers/daily_summary_provider.dart';
 import 'package:lean_streak/providers/log_meal_controller.dart';
 import 'package:lean_streak/providers/meal_provider.dart';
 import 'package:lean_streak/providers/user_profile_provider.dart';
+import 'package:lean_streak/screens/dashboard/helpers/check_in_dialog.dart';
 import 'package:lean_streak/screens/dashboard/helpers/score_info_dialog.dart';
 import 'package:lean_streak/screens/meals/log_meal_sheet.dart';
+import 'package:lean_streak/services/check_in_service.dart';
+import 'package:lean_streak/widgets/password_confirm_dialog.dart';
 
-class DashboardScreen extends ConsumerWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  String? _scheduledPromptPeriodKey;
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
+    final accountActionState = ref.watch(accountControllerProvider);
     final profileAsync = ref.watch(userProfileProvider);
+    final checkInAvailabilityAsync = ref.watch(
+      currentCheckInAvailabilityProvider,
+    );
     final today = DateTime.now();
     final dateKey = DateFormat('yyyy-MM-dd').format(today);
+
+    ref.listen<AsyncValue<CheckInAvailability?>>(
+      currentCheckInAvailabilityProvider,
+      (_, next) {
+        final availability = next.valueOrNull;
+        final period = availability?.period;
+        if (availability == null ||
+            period == null ||
+            !availability.isDue ||
+            availability.isCompleted ||
+            availability.hasPromptBeenShown ||
+            _scheduledPromptPeriodKey == period.key) {
+          return;
+        }
+
+        _scheduledPromptPeriodKey = period.key;
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          await ref
+              .read(checkInControllerProvider.notifier)
+              .markPromptShown(
+                periodKey: period.key,
+                periodStart: period.startDate,
+                periodEnd: period.endDate,
+              );
+          if (!context.mounted) return;
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('A 2-week check-in is ready.'),
+              action: SnackBarAction(
+                label: 'Open',
+                onPressed: () {
+                  _openCheckInFlow(context, availability);
+                },
+              ),
+            ),
+          );
+        });
+      },
+    );
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -42,14 +99,23 @@ class DashboardScreen extends ConsumerWidget {
               switch (action) {
                 case _DashboardMenuAction.scoreInfo:
                   showScoreInfoDialog(context);
+                case _DashboardMenuAction.checkIn:
+                  await _openCheckInFlow(
+                    context,
+                    checkInAvailabilityAsync.valueOrNull,
+                  );
                 case _DashboardMenuAction.profile:
                   context.push(AppRoutes.profile);
                 case _DashboardMenuAction.review:
                   context.push(AppRoutes.review);
                 case _DashboardMenuAction.summary:
                   context.push(AppRoutes.summary);
+                case _DashboardMenuAction.resetProgress:
+                  await _confirmAndResetProgress(context);
                 case _DashboardMenuAction.signOut:
-                  if (authState.isLoading) return;
+                  if (authState.isLoading || accountActionState.isLoading) {
+                    return;
+                  }
                   await ref.read(authControllerProvider.notifier).signOut();
               }
             },
@@ -57,6 +123,10 @@ class DashboardScreen extends ConsumerWidget {
               const PopupMenuItem(
                 value: _DashboardMenuAction.scoreInfo,
                 child: Text('How scoring works'),
+              ),
+              const PopupMenuItem(
+                value: _DashboardMenuAction.checkIn,
+                child: Text('Check-in'),
               ),
               const PopupMenuItem(
                 value: _DashboardMenuAction.profile,
@@ -71,8 +141,15 @@ class DashboardScreen extends ConsumerWidget {
                 child: Text('Summary'),
               ),
               PopupMenuItem(
+                value: _DashboardMenuAction.resetProgress,
+                enabled: !accountActionState.isLoading,
+                child: accountActionState.isLoading
+                    ? const Text('Working...')
+                    : const Text('Reset Progress'),
+              ),
+              PopupMenuItem(
                 value: _DashboardMenuAction.signOut,
-                enabled: !authState.isLoading,
+                enabled: !authState.isLoading && !accountActionState.isLoading,
                 child: authState.isLoading
                     ? const Text('Signing out...')
                     : const Text('Log out'),
@@ -192,6 +269,71 @@ class DashboardScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _openCheckInFlow(
+    BuildContext context,
+    CheckInAvailability? availability,
+  ) async {
+    if (availability == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Check-in is not ready yet.')),
+      );
+      return;
+    }
+
+    if (!availability.isDue || availability.period == null) {
+      await showCheckInUnavailableDialog(
+        context,
+        nextAvailableDate: availability.nextAvailableDate,
+      );
+      return;
+    }
+
+    final result = await showCheckInDialog(context, availability: availability);
+
+    if (!context.mounted || result == null) return;
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Check-in saved.')));
+
+    if (result == CheckInDialogResult.savedAndOpenProfile) {
+      if (!context.mounted) return;
+      context.push(AppRoutes.profile);
+    }
+  }
+
+  Future<void> _confirmAndResetProgress(BuildContext context) async {
+    final password = await showPasswordConfirmDialog(
+      context,
+      title: 'Reset progress?',
+      description:
+          'This deletes your meals, daily scores, check-ins, and AI usage. Your profile and login stay.',
+      confirmLabel: 'Reset',
+      destructive: true,
+    );
+
+    if (password == null || !context.mounted) return;
+
+    try {
+      await ref
+          .read(accountControllerProvider.notifier)
+          .resetProgress(password: password);
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Progress reset.')));
+    } catch (error) {
+      if (!context.mounted) return;
+      final message = error is AccountActionException
+          ? error.message
+          : 'Could not reset progress right now.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
   }
 }
 
@@ -786,4 +928,12 @@ class _MealCard extends StatelessWidget {
 
 enum _MealAction { edit, delete }
 
-enum _DashboardMenuAction { scoreInfo, profile, review, summary, signOut }
+enum _DashboardMenuAction {
+  scoreInfo,
+  checkIn,
+  profile,
+  review,
+  summary,
+  resetProgress,
+  signOut,
+}

@@ -42,12 +42,17 @@ class HealthCalculator {
     return bmr * activityMultiplier(level);
   }
 
+  static double maintenanceCalories(double tdee) {
+    return tdee;
+  }
+
   /// Converts the user's chosen weight-loss pace to kg/week.
   static double goalPaceFromWeightLossPace(WeightLossPace pace) {
     return switch (pace) {
       WeightLossPace.slow => 0.50,
       WeightLossPace.moderate => 0.75,
       WeightLossPace.fast => 1.00,
+      WeightLossPace.maintain => 0.0,
     };
   }
 

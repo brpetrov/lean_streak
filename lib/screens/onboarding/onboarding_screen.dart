@@ -42,24 +42,41 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   _GoalPreview? get _preview {
     final currentWeight = double.tryParse(_currentWeightCtrl.text);
-    final targetWeight = double.tryParse(_targetWeightCtrl.text);
     final height = double.tryParse(_heightCtrl.text);
     final age = int.tryParse(_ageCtrl.text);
 
     if (currentWeight == null ||
-        targetWeight == null ||
         height == null ||
         age == null ||
-        _gender == null ||
-        targetWeight >= currentWeight) {
+        _gender == null) {
+      return null;
+    }
+
+    final calcBmr = HealthCalculator.bmr(currentWeight, height, age, _gender!);
+    final calcTdee = HealthCalculator.tdee(calcBmr, _activityLevel);
+    if (_weightLossPace == WeightLossPace.maintain) {
+      return _GoalPreview(
+        isMaintaining: true,
+        calories: HealthCalculator.maintenanceCalories(calcTdee),
+        pace: 0,
+        paceLevel: GoalPaceLevel.safe,
+        targetDate: DateTime.now(),
+        tdee: calcTdee,
+        clamped: false,
+      );
+    }
+
+    final targetWeight = double.tryParse(_targetWeightCtrl.text);
+    if (targetWeight == null || targetWeight >= currentWeight) {
       return null;
     }
 
     final pace = HealthCalculator.goalPaceFromWeightLossPace(_weightLossPace);
     final targetDate = HealthCalculator.targetDateFromWeightLossPace(
-        currentWeight, targetWeight, _weightLossPace);
-    final calcBmr = HealthCalculator.bmr(currentWeight, height, age, _gender!);
-    final calcTdee = HealthCalculator.tdee(calcBmr, _activityLevel);
+      currentWeight,
+      targetWeight,
+      _weightLossPace,
+    );
     final paceLevel = HealthCalculator.goalPaceLevel(pace);
     final (:calories, :clamped) = HealthCalculator.dailyCalorieTargetFromPace(
       tdee: calcTdee,
@@ -68,10 +85,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     );
 
     return _GoalPreview(
+      isMaintaining: false,
       calories: calories,
       pace: pace,
       paceLevel: paceLevel,
       targetDate: targetDate,
+      tdee: calcTdee,
       clamped: clamped,
     );
   }
@@ -85,21 +104,24 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       return;
     }
 
-    await ref.read(onboardingControllerProvider.notifier).submit(
+    await ref
+        .read(onboardingControllerProvider.notifier)
+        .submit(
           name: _nameCtrl.text,
           age: int.parse(_ageCtrl.text),
           gender: _gender!,
           heightCm: double.parse(_heightCtrl.text),
           currentWeightKg: double.parse(_currentWeightCtrl.text),
-          targetWeightKg: double.parse(_targetWeightCtrl.text),
+          targetWeightKg: _weightLossPace == WeightLossPace.maintain
+              ? null
+              : double.parse(_targetWeightCtrl.text),
           activityLevel: _activityLevel,
           weightLossPace: _weightLossPace,
         );
   }
 
   void _showSnack(String msg) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -140,7 +162,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 const SizedBox(height: 6),
                 const Text(
                   'Tell us about yourself so we can build your personal plan.',
-                  style: TextStyle(fontSize: 15, color: AppColors.textSecondary),
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 const SizedBox(height: 32),
 
@@ -178,7 +203,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 const SizedBox(height: 14),
                 const Text(
                   'Gender',
-                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -212,11 +240,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       child: TextFormField(
                         controller: _heightCtrl,
                         keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
+                          decimal: true,
+                        ),
                         textInputAction: TextInputAction.next,
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(
-                              RegExp(r'^\d{0,3}\.?\d{0,1}')),
+                            RegExp(r'^\d{0,3}\.?\d{0,1}'),
+                          ),
                         ],
                         decoration: const InputDecoration(
                           labelText: 'Height',
@@ -235,11 +265,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       child: TextFormField(
                         controller: _currentWeightCtrl,
                         keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
+                          decimal: true,
+                        ),
                         textInputAction: TextInputAction.next,
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(
-                              RegExp(r'^\d{0,3}\.?\d{0,1}')),
+                            RegExp(r'^\d{0,3}\.?\d{0,1}'),
+                          ),
                         ],
                         decoration: const InputDecoration(
                           labelText: 'Current weight',
@@ -259,38 +291,84 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
                 // ── Your goal ──────────────────────────────────────────
                 const _SectionLabel('YOUR GOAL'),
-                TextFormField(
-                  controller: _targetWeightCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  textInputAction: TextInputAction.done,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(
-                        RegExp(r'^\d{0,3}\.?\d{0,1}')),
-                  ],
-                  decoration: const InputDecoration(
-                    labelText: 'Target weight',
-                    suffixText: 'kg',
-                    prefixIcon: Icon(Icons.flag_outlined),
+                const Text(
+                  'Choose how quickly you want to lose weight, or maintain instead.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
                   ),
-                  validator: (v) {
-                    final n = double.tryParse(v ?? '');
-                    if (n == null) return 'Required';
-                    if (n < 30 || n > 300) return '30–300 kg';
-                    final current = double.tryParse(_currentWeightCtrl.text);
-                    if (current != null && n >= current) {
-                      return 'Must be less than your current weight';
-                    }
-                    return null;
-                  },
                 ),
+                const SizedBox(height: 12),
+                ...WeightLossPace.values.map(
+                  (pace) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _PaceCard(
+                      pace: pace,
+                      selected: _weightLossPace == pace,
+                      onTap: () => setState(() => _weightLossPace = pace),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (_weightLossPace != WeightLossPace.maintain) ...[
+                  TextFormField(
+                    controller: _targetWeightCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    textInputAction: TextInputAction.done,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'^\d{0,3}\.?\d{0,1}'),
+                      ),
+                    ],
+                    decoration: const InputDecoration(
+                      labelText: 'Target weight',
+                      suffixText: 'kg',
+                      prefixIcon: Icon(Icons.flag_outlined),
+                    ),
+                    validator: (v) {
+                      if (_weightLossPace == WeightLossPace.maintain) {
+                        return null;
+                      }
+                      final n = double.tryParse(v ?? '');
+                      if (n == null) return 'Required';
+                      if (n < 30 || n > 300) return '30-300 kg';
+                      final current = double.tryParse(_currentWeightCtrl.text);
+                      if (current != null && n >= current) {
+                        return 'Must be less than your current weight';
+                      }
+                      return null;
+                    },
+                  ),
+                ] else ...[
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.divider),
+                    ),
+                    child: const Text(
+                      'We will aim for a daily calorie target close to your maintenance calories.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 28),
 
                 // ── Activity level ─────────────────────────────────────
                 const _SectionLabel('HOW ACTIVE ARE YOU?'),
                 const Text(
                   'Used to estimate how many calories you burn each day.',
-                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 ...ActivityLevel.values.map(
@@ -306,23 +384,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 const SizedBox(height: 20),
 
                 // ── Weight loss pace ───────────────────────────────────
-                const _SectionLabel('HOW FAST DO YOU WANT TO LOSE WEIGHT?'),
-                const Text(
-                  'Determines your daily calorie target and how long it will take.',
-                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: 12),
-                ...WeightLossPace.values.map(
-                  (pace) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _PaceCard(
-                      pace: pace,
-                      selected: _weightLossPace == pace,
-                      onTap: () => setState(() => _weightLossPace = pace),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
 
                 // ── Plan preview ───────────────────────────────────────
                 if (preview != null) ...[
@@ -369,17 +430,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
 class _GoalPreview {
   const _GoalPreview({
+    required this.isMaintaining,
     required this.calories,
     required this.pace,
     required this.paceLevel,
     required this.targetDate,
+    required this.tdee,
     required this.clamped,
   });
 
+  final bool isMaintaining;
   final double calories;
   final double pace;
   final GoalPaceLevel paceLevel;
   final DateTime targetDate;
+  final double tdee;
   final bool clamped;
 }
 
@@ -409,8 +474,11 @@ class _SectionLabel extends StatelessWidget {
 }
 
 class _GenderButton extends StatelessWidget {
-  const _GenderButton(
-      {required this.label, required this.selected, required this.onTap});
+  const _GenderButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
   final String label;
   final bool selected;
   final VoidCallback onTap;
@@ -445,83 +513,90 @@ class _GenderButton extends StatelessWidget {
 // ── Activity level card ────────────────────────────────────────────────────
 
 class _ActivityCard extends StatelessWidget {
-  const _ActivityCard(
-      {required this.level, required this.selected, required this.onTap});
+  const _ActivityCard({
+    required this.level,
+    required this.selected,
+    required this.onTap,
+  });
   final ActivityLevel level;
   final bool selected;
   final VoidCallback onTap;
 
   static String _title(ActivityLevel l) => switch (l) {
-        ActivityLevel.light => 'Mostly sedentary',
-        ActivityLevel.medium => 'Lightly active',
-        ActivityLevel.hard => 'Very active',
-      };
+    ActivityLevel.light => 'Mostly sedentary',
+    ActivityLevel.medium => 'Lightly active',
+    ActivityLevel.hard => 'Very active',
+  };
 
   static String _description(ActivityLevel l) => switch (l) {
-        ActivityLevel.light =>
-          'Desk job, little exercise, low daily movement.',
-        ActivityLevel.medium =>
-          'Some walking or light exercise a few times per week.',
-        ActivityLevel.hard =>
-          'Regular training, physical job, or high daily movement.',
-      };
+    ActivityLevel.light => 'Desk job, little exercise, low daily movement.',
+    ActivityLevel.medium =>
+      'Some walking or light exercise a few times per week.',
+    ActivityLevel.hard =>
+      'Regular training, physical job, or high daily movement.',
+  };
 
   static IconData _icon(ActivityLevel l) => switch (l) {
-        ActivityLevel.light => Icons.weekend_outlined,
-        ActivityLevel.medium => Icons.directions_walk_outlined,
-        ActivityLevel.hard => Icons.fitness_center_outlined,
-      };
+    ActivityLevel.light => Icons.weekend_outlined,
+    ActivityLevel.medium => Icons.directions_walk_outlined,
+    ActivityLevel.hard => Icons.fitness_center_outlined,
+  };
 
   @override
-  Widget build(BuildContext context) =>
-      _SelectionCard(
-        title: _title(level),
-        description: _description(level),
-        icon: _icon(level),
-        selected: selected,
-        onTap: onTap,
-      );
+  Widget build(BuildContext context) => _SelectionCard(
+    title: _title(level),
+    description: _description(level),
+    icon: _icon(level),
+    selected: selected,
+    onTap: onTap,
+  );
 }
 
 // ── Weight loss pace card ──────────────────────────────────────────────────
 
 class _PaceCard extends StatelessWidget {
-  const _PaceCard(
-      {required this.pace, required this.selected, required this.onTap});
+  const _PaceCard({
+    required this.pace,
+    required this.selected,
+    required this.onTap,
+  });
   final WeightLossPace pace;
   final bool selected;
   final VoidCallback onTap;
 
   static String _title(WeightLossPace p) => switch (p) {
-        WeightLossPace.slow => 'Slow — 0.5 kg/week',
-        WeightLossPace.moderate => 'Moderate — 0.75 kg/week',
-        WeightLossPace.fast => 'Fast — 1.0 kg/week',
-      };
+    WeightLossPace.slow => 'Slow - 0.5 kg/week',
+    WeightLossPace.moderate => 'Moderate - 0.75 kg/week',
+    WeightLossPace.fast => 'Fast - 1.0 kg/week',
+    WeightLossPace.maintain => 'Maintain weight',
+  };
 
   static String _description(WeightLossPace p) => switch (p) {
-        WeightLossPace.slow =>
-          'Gentle and easy to maintain. Takes longer but less restriction.',
-        WeightLossPace.moderate =>
-          'Good balance of speed and sustainability. Recommended for most.',
-        WeightLossPace.fast =>
-          'Faster results. Requires more discipline and consistency.',
-      };
+    WeightLossPace.slow =>
+      'Gentle and easy to maintain. Takes longer but less restriction.',
+    WeightLossPace.moderate =>
+      'Good balance of speed and sustainability. Recommended for most.',
+    WeightLossPace.fast =>
+      'Faster results. Requires more discipline and consistency.',
+    WeightLossPace.maintain =>
+      'Keeps your calories around maintenance instead of creating a deficit.',
+  };
 
   static IconData _icon(WeightLossPace p) => switch (p) {
-        WeightLossPace.slow => Icons.hourglass_bottom_rounded,
-        WeightLossPace.moderate => Icons.trending_down_rounded,
-        WeightLossPace.fast => Icons.bolt_rounded,
-      };
+    WeightLossPace.slow => Icons.hourglass_bottom_rounded,
+    WeightLossPace.moderate => Icons.trending_down_rounded,
+    WeightLossPace.fast => Icons.bolt_rounded,
+    WeightLossPace.maintain => Icons.horizontal_rule_rounded,
+  };
 
   @override
-  Widget build(BuildContext context) =>
-      _SelectionCard(
-        title: _title(pace),
-        description: _description(pace),
-        icon: _icon(pace),
-        selected: selected,
-        onTap: onTap,
-      );
+  Widget build(BuildContext context) => _SelectionCard(
+    title: _title(pace),
+    description: _description(pace),
+    icon: _icon(pace),
+    selected: selected,
+    onTap: onTap,
+  );
 }
 
 // ── Shared selection card ──────────────────────────────────────────────────
@@ -584,14 +659,19 @@ class _SelectionCard extends StatelessWidget {
                   Text(
                     description,
                     style: const TextStyle(
-                        fontSize: 13, color: AppColors.textSecondary),
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),
             ),
             if (selected)
-              const Icon(Icons.check_circle_rounded,
-                  color: AppColors.primary, size: 20),
+              const Icon(
+                Icons.check_circle_rounded,
+                color: AppColors.primary,
+                size: 20,
+              ),
           ],
         ),
       ),
@@ -606,24 +686,24 @@ class _PlanPreviewCard extends StatelessWidget {
   final _GoalPreview preview;
 
   Color get _color => switch (preview.paceLevel) {
-        GoalPaceLevel.safe => AppColors.veryGood,
-        GoalPaceLevel.caution => AppColors.bad,
-        GoalPaceLevel.warning => AppColors.veryBad,
-      };
+    GoalPaceLevel.safe => AppColors.veryGood,
+    GoalPaceLevel.caution => AppColors.bad,
+    GoalPaceLevel.warning => AppColors.veryBad,
+  };
 
   String get _paceLabel => switch (preview.paceLevel) {
-        GoalPaceLevel.safe => 'Safe pace',
-        GoalPaceLevel.caution => 'Caution — fast pace',
-        GoalPaceLevel.warning => 'Very aggressive',
-      };
+    GoalPaceLevel.safe => 'Safe pace',
+    GoalPaceLevel.caution => 'Caution — fast pace',
+    GoalPaceLevel.warning => 'Very aggressive',
+  };
 
   String get _paceMessage => switch (preview.paceLevel) {
-        GoalPaceLevel.safe => 'Healthy and sustainable.',
-        GoalPaceLevel.caution =>
-          'Faster than average. Stay consistent with your nutrition.',
-        GoalPaceLevel.warning =>
-          'Very aggressive. Make sure you stay fuelled and healthy.',
-      };
+    GoalPaceLevel.safe => 'Healthy and sustainable.',
+    GoalPaceLevel.caution =>
+      'Faster than average. Stay consistent with your nutrition.',
+    GoalPaceLevel.warning =>
+      'Very aggressive. Make sure you stay fuelled and healthy.',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -646,7 +726,10 @@ class _PlanPreviewCard extends StatelessWidget {
               Text(
                 'Your plan',
                 style: TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w600, color: _color),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: _color,
+                ),
               ),
             ],
           ),
@@ -655,13 +738,15 @@ class _PlanPreviewCard extends StatelessWidget {
             children: [
               Expanded(
                 child: _Stat(
-                    label: 'Daily target',
-                    value: '${preview.calories.round()} kcal'),
+                  label: 'Daily target',
+                  value: '${preview.calories.round()} kcal',
+                ),
               ),
               Expanded(
                 child: _Stat(
-                    label: 'Loss per week',
-                    value: '${preview.pace.toStringAsFixed(2)} kg'),
+                  label: 'Loss per week',
+                  value: '${preview.pace.toStringAsFixed(2)} kg',
+                ),
               ),
               Expanded(
                 child: _Stat(label: 'Goal by', value: dateStr),
@@ -687,22 +772,28 @@ class _PlanPreviewCard extends StatelessWidget {
                     Text(
                       _paceLabel,
                       style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: _color),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _color,
+                      ),
                     ),
                     const SizedBox(height: 2),
-                    Text(_paceMessage,
-                        style: const TextStyle(
-                            fontSize: 13, color: AppColors.textSecondary)),
+                    Text(
+                      _paceMessage,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                     if (preview.clamped) ...[
                       const SizedBox(height: 4),
                       const Text(
                         'Calorie target set to safe minimum floor.',
                         style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                            fontStyle: FontStyle.italic),
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          fontStyle: FontStyle.italic,
+                        ),
                       ),
                     ],
                   ],
@@ -726,15 +817,19 @@ class _Stat extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(
-                fontSize: 11, color: AppColors.textSecondary)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+        ),
         const SizedBox(height: 2),
-        Text(value,
-            style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary)),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
       ],
     );
   }
