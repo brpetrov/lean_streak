@@ -1,11 +1,11 @@
 {
-    "name": "lean_streak",
-    "short_name": "lean_streak",
+    "name": "LeanStreak",
+    "short_name": "LeanStreak",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#2E7D6E",
+    "theme_color": "#2E7D6E",
+    "description": "LeanStreak - A low-friction habit and calorie consistency tracker",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -14,11 +14,9 @@ Future<void> showLogMealSheet(BuildContext context, {Meal? existingMeal}) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => SafeArea(
-      top: false,
-      child: _LogMealSheet(existingMeal: existingMeal),
-    ),
+    builder: (_) => _LogMealSheet(existingMeal: existingMeal),
   );
 }
 
@@ -173,9 +171,11 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
         ? _CalorieInputMode.manual
         : _inputMode;
     final mediaQuery = MediaQuery.of(context);
-    final footerBottomPadding = mediaQuery.viewInsets.bottom > 0
-        ? mediaQuery.viewInsets.bottom
-        : mediaQuery.viewPadding.bottom;
+    final footerBottomPadding =
+        (mediaQuery.viewInsets.bottom > 0
+                ? mediaQuery.viewInsets.bottom
+                : mediaQuery.viewPadding.bottom) +
+            16;
 
     return Container(
       constraints: BoxConstraints(
@@ -305,7 +305,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
             curve: Curves.easeOut,
             padding: EdgeInsets.only(
               top: 8,
-              bottom: footerBottomPadding == 0 ? 24 : footerBottomPadding,
+              bottom: footerBottomPadding,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,

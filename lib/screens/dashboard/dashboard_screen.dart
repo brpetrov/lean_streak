@@ -15,6 +15,7 @@ import 'package:lean_streak/providers/check_in_state_provider.dart';
 import 'package:lean_streak/providers/daily_summary_provider.dart';
 import 'package:lean_streak/providers/log_meal_controller.dart';
 import 'package:lean_streak/providers/meal_provider.dart';
+import 'package:lean_streak/providers/review_provider.dart';
 import 'package:lean_streak/providers/user_profile_provider.dart';
 import 'package:lean_streak/screens/dashboard/helpers/check_in_dialog.dart';
 import 'package:lean_streak/screens/meals/log_meal_sheet.dart';
@@ -85,11 +86,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       appBar: AppBar(
         title: const Text('LeanStreak'),
         actions: [
-          IconButton(
-            tooltip: 'Log meal',
-            onPressed: () => showLogMealSheet(context),
-            icon: const Icon(Icons.add_rounded),
-          ),
           PopupMenuButton<_DashboardMenuAction>(
             tooltip: 'More options',
             onSelected: (action) async {
@@ -156,6 +152,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => showLogMealSheet(context),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.add_rounded),
+      ),
       body: profileAsync.when(
         data: (profile) {
           if (profile == null) {
@@ -189,7 +191,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 profile: profile,
                 meals: meals,
                 summary: summary,
-                onLogMeal: () => showLogMealSheet(context),
                 onOpenReview: () => context.push(AppRoutes.review),
                 onEditMeal: (meal) =>
                     showLogMealSheet(context, existingMeal: meal),
@@ -220,7 +221,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   if (confirmed != true || !context.mounted) return;
 
                   try {
-                    await ref.read(logMealControllerProvider.notifier).delete(meal);
+                    await ref
+                        .read(logMealControllerProvider.notifier)
+                        .delete(meal);
                   } catch (_) {
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -278,9 +281,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final result = await showCheckInDialog(context, availability: availability);
     if (!context.mounted || result == null) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Check-in saved.')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Check-in saved.')));
 
     if (result == CheckInDialogResult.savedAndOpenProfile) {
       context.push(AppRoutes.profile);
@@ -304,28 +307,27 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           .read(accountControllerProvider.notifier)
           .resetProgress(password: password);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Progress reset.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Progress reset.')));
     } catch (error) {
       if (!context.mounted) return;
       final message = error is AccountActionException
           ? error.message
           : 'Could not reset progress right now.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 }
 
-class _DashboardContent extends StatelessWidget {
+class _DashboardContent extends ConsumerWidget {
   const _DashboardContent({
     required this.date,
     required this.profile,
     required this.meals,
     required this.summary,
-    required this.onLogMeal,
     required this.onOpenReview,
     required this.onEditMeal,
     required this.onDeleteMeal,
@@ -335,13 +337,12 @@ class _DashboardContent extends StatelessWidget {
   final UserProfile profile;
   final List<Meal> meals;
   final DailySummary summary;
-  final VoidCallback onLogMeal;
   final VoidCallback onOpenReview;
   final ValueChanged<Meal> onEditMeal;
   final Future<void> Function(Meal meal) onDeleteMeal;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final bottomPadding = MediaQuery.of(context).padding.bottom + 32;
 
     return ListView(
@@ -349,37 +350,7 @@ class _DashboardContent extends StatelessWidget {
       children: [
         _HeaderSection(date: date, name: profile.name),
         const SizedBox(height: 20),
-        FilledButton.icon(
-          onPressed: onLogMeal,
-          style: FilledButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            minimumSize: const Size.fromHeight(54),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-          icon: const Icon(Icons.add),
-          label: const Text(
-            'Log Meal',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-          ),
-        ),
-        const SizedBox(height: 16),
-        OutlinedButton.icon(
-          onPressed: onOpenReview,
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(50),
-            side: const BorderSide(color: AppColors.divider),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-          icon: const Icon(Icons.calendar_month_rounded),
-          label: const Text(
-            'Open Review',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-          ),
-        ),
+        _MonthPreviewCard(date: date, onOpenReview: onOpenReview),
         const SizedBox(height: 16),
         _CalorieOverviewCard(summary: summary),
         const SizedBox(height: 16),
@@ -541,6 +512,211 @@ class _CalorieOverviewCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _MonthPreviewCard extends ConsumerWidget {
+  const _MonthPreviewCard({required this.date, required this.onOpenReview});
+
+  final DateTime date;
+  final VoidCallback onOpenReview;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final startOfMonth = DateTime(date.year, date.month, 1);
+    final today = DateTime(date.year, date.month, date.day);
+    final range = ReviewRange(startDate: startOfMonth, endDate: today);
+    final summariesAsync = ref.watch(reviewSummariesProvider(range));
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: summariesAsync.when(
+        data: (summariesByDate) {
+          final days = List.generate(
+            today.day,
+            (index) => DateTime(date.year, date.month, index + 1),
+          );
+          final summaries = days
+              .map(
+                (day) => summariesByDate[DateFormat('yyyy-MM-dd').format(day)],
+              )
+              .whereType<DailySummary>()
+              .toList();
+          final greenDays = summaries
+              .where((summary) => summary.status == DailyStatus.green)
+              .length;
+          final yellowDays = summaries
+              .where((summary) => summary.status == DailyStatus.yellow)
+              .length;
+          final redDays = summaries
+              .where((summary) => summary.status == DailyStatus.red)
+              .length;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Month Preview',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${DateFormat('MMMM').format(date)} so far',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: onOpenReview,
+                    child: const Text('Open'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 96,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: days.map((day) {
+                    final summary =
+                        summariesByDate[DateFormat('yyyy-MM-dd').format(day)];
+                    return Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                        child: _MonthPreviewBar(summary: summary),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      summaries.isEmpty
+                          ? 'No logged days yet this month.'
+                          : '${summaries.length} logged days this month.',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  _MiniStatusChip(
+                    label: '$greenDays',
+                    color: AppColors.veryGood,
+                  ),
+                  const SizedBox(width: 6),
+                  _MiniStatusChip(label: '$yellowDays', color: AppColors.bad),
+                  const SizedBox(width: 6),
+                  _MiniStatusChip(label: '$redDays', color: AppColors.veryBad),
+                ],
+              ),
+            ],
+          );
+        },
+        loading: () => const SizedBox(
+          height: 148,
+          child: Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
+        ),
+        error: (_, _) => const SizedBox(
+          height: 148,
+          child: Center(
+            child: Text(
+              'Could not load month preview.',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MonthPreviewBar extends StatelessWidget {
+  const _MonthPreviewBar({required this.summary});
+
+  final DailySummary? summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = summary == null
+        ? AppColors.divider
+        : _statusColor(summary!.status);
+    final heightFactor = summary == null
+        ? 0.08
+        : ((summary!.totalCalories / summary!.targetCalories.clamp(1, 100000))
+                      .clamp(0.15, 1.25) /
+                  1.25)
+              .toDouble();
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: FractionallySizedBox(
+        heightFactor: heightFactor,
+        child: Container(
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniStatusChip extends StatelessWidget {
+  const _MiniStatusChip({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+        ),
       ),
     );
   }
@@ -760,7 +936,10 @@ class _MealCard extends StatelessWidget {
                 },
                 itemBuilder: (context) => const [
                   PopupMenuItem(value: _MealAction.edit, child: Text('Edit')),
-                  PopupMenuItem(value: _MealAction.delete, child: Text('Delete')),
+                  PopupMenuItem(
+                    value: _MealAction.delete,
+                    child: Text('Delete'),
+                  ),
                 ],
               ),
             ],

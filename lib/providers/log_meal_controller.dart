@@ -44,6 +44,7 @@ class LogMealController extends AsyncNotifier<void> {
       }
 
       await ref.read(dailySummaryServiceProvider).recomputeForDate(uid, date);
+      ref.invalidate(dailySummaryRepositoryProvider);
     });
   }
 
@@ -57,6 +58,7 @@ class LogMealController extends AsyncNotifier<void> {
       await ref
           .read(dailySummaryServiceProvider)
           .recomputeForDate(uid, meal.date);
+      ref.invalidate(dailySummaryRepositoryProvider);
     });
   }
 }

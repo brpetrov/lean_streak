@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lean_streak/app/app.dart';
 import 'package:lean_streak/firebase_options.dart';
+import 'package:lean_streak/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,5 +14,6 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
   }
+  await NotificationService.initializeAndScheduleDailyReminder();
   runApp(const ProviderScope(child: LeanStreakApp()));
 }
