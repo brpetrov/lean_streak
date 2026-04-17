@@ -20,7 +20,8 @@ class NotificationService {
     final permissionGranted = await _requestPermissionIfNeeded();
     if (!permissionGranted) return;
 
-    await _scheduleDailyReminder();
+    final androidScheduleMode = await _resolveAndroidScheduleMode();
+    await _scheduleDailyReminder(androidScheduleMode: androidScheduleMode);
   }
 
   static bool get _supportsLocalNotifications {
@@ -59,7 +60,7 @@ class NotificationService {
               AndroidFlutterLocalNotificationsPlugin
             >();
         return await androidImplementation?.requestNotificationsPermission() ??
-            false;
+            true;
       case TargetPlatform.iOS:
         final iosImplementation = _notifications
             .resolvePlatformSpecificImplementation<
@@ -76,7 +77,32 @@ class NotificationService {
     }
   }
 
-  static Future<void> _scheduleDailyReminder() async {
+  static Future<AndroidScheduleMode> _resolveAndroidScheduleMode() async {
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      return AndroidScheduleMode.inexactAllowWhileIdle;
+    }
+
+    final androidImplementation = _notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+
+    final canScheduleExact =
+        await androidImplementation?.canScheduleExactNotifications() ?? false;
+    if (canScheduleExact) {
+      return AndroidScheduleMode.exactAllowWhileIdle;
+    }
+
+    final grantedExactPermission =
+        await androidImplementation?.requestExactAlarmsPermission() ?? false;
+    return grantedExactPermission
+        ? AndroidScheduleMode.exactAllowWhileIdle
+        : AndroidScheduleMode.inexactAllowWhileIdle;
+  }
+
+  static Future<void> _scheduleDailyReminder({
+    required AndroidScheduleMode androidScheduleMode,
+  }) async {
     await _notifications.cancel(id: _dailyReminderId);
 
     final now = tz.TZDateTime.now(tz.local);
@@ -110,7 +136,7 @@ class NotificationService {
       body: 'Open LeanStreak and log your meals for today.',
       scheduledDate: scheduledTime,
       notificationDetails: notificationDetails,
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: androidScheduleMode,
       matchDateTimeComponents: DateTimeComponents.time,
     );
   }

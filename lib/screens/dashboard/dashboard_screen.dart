@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -29,8 +31,61 @@ class DashboardScreen extends ConsumerStatefulWidget {
   ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+class _DashboardScreenState extends ConsumerState<DashboardScreen>
+    with WidgetsBindingObserver {
   String? _scheduledPromptPeriodKey;
+  late DateTime _activeDate;
+  Timer? _midnightRefreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _activeDate = _normalizeDate(DateTime.now());
+    WidgetsBinding.instance.addObserver(this);
+    _scheduleMidnightRefresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _midnightRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshActiveDateIfNeeded();
+    }
+  }
+
+  void _scheduleMidnightRefresh() {
+    _midnightRefreshTimer?.cancel();
+    final now = DateTime.now();
+    final nextMidnight = DateTime(now.year, now.month, now.day + 1);
+    final delay = nextMidnight.difference(now) + const Duration(seconds: 1);
+    _midnightRefreshTimer = Timer(delay, _refreshActiveDateIfNeeded);
+  }
+
+  void _refreshActiveDateIfNeeded() {
+    final nextDate = _normalizeDate(DateTime.now());
+    if (!_isSameDate(_activeDate, nextDate)) {
+      ref.invalidate(currentCheckInAvailabilityProvider);
+      ref.invalidate(reviewPeriodsProvider);
+      setState(() {
+        _activeDate = nextDate;
+      });
+    }
+    _scheduleMidnightRefresh();
+  }
+
+  DateTime _normalizeDate(DateTime value) {
+    return DateTime(value.year, value.month, value.day);
+  }
+
+  bool _isSameDate(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +95,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final checkInAvailabilityAsync = ref.watch(
       currentCheckInAvailabilityProvider,
     );
-    final today = DateTime.now();
+    final today = _activeDate;
     final dateKey = DateFormat('yyyy-MM-dd').format(today);
 
     ref.listen<AsyncValue<CheckInAvailability?>>(
@@ -882,6 +937,9 @@ class _MealCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final time = DateFormat('HH:mm').format(meal.timestamp);
+    final mealName = (meal.name?.trim().isNotEmpty ?? false)
+        ? meal.name!.trim()
+        : 'Unnamed meal';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -900,7 +958,7 @@ class _MealCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      time,
+                      mealName,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -908,9 +966,9 @@ class _MealCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      'Logged meal',
-                      style: TextStyle(
+                    Text(
+                      time,
+                      style: const TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,
                       ),
@@ -944,38 +1002,44 @@ class _MealCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: meal.tags.map((tag) {
-              final color = tag.isPositive
-                  ? AppColors.tagPositive
-                  : AppColors.tagWarning;
-              final background = tag.isPositive
-                  ? AppColors.tagPositiveBg
-                  : AppColors.tagWarningBg;
+          if (meal.tags.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: meal.tags.map((tag) {
+                final color = tag.isPositive
+                    ? AppColors.tagPositive
+                    : tag.isNeutral
+                    ? AppColors.tagNeutral
+                    : AppColors.tagWarning;
+                final background = tag.isPositive
+                    ? AppColors.tagPositiveBg
+                    : tag.isNeutral
+                    ? AppColors.tagNeutralBg
+                    : AppColors.tagWarningBg;
 
-              return Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: background,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  tag.label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: color,
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
                   ),
-                ),
-              );
-            }).toList(),
-          ),
+                  decoration: BoxDecoration(
+                    color: background,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    tag.label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
           if (meal.note != null) ...[
             const SizedBox(height: 12),
             Text(

@@ -100,7 +100,10 @@ class PeriodReviewService {
             (value) => value?.value == entry.key,
             orElse: () => null,
           );
-          return tag != null && tag.isPositive == positive;
+          return tag != null &&
+              (positive
+                  ? tag.tone == MealTagTone.healthy
+                  : tag.tone == MealTagTone.unhealthy);
         })
         .map((entry) {
           final tag = MealTag.fromString(entry.key);

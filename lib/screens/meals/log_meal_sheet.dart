@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:speech_to_text/speech_recognition_error.dart';
+import 'package:speech_to_text/speech_recognition_result.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 
 import 'package:lean_streak/core/constants/app_colors.dart';
 import 'package:lean_streak/models/meal.dart';
@@ -32,9 +35,11 @@ class _LogMealSheet extends ConsumerStatefulWidget {
 }
 
 class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
+  final _nameController = TextEditingController();
   final _caloriesController = TextEditingController();
   final _noteController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _speechToText = SpeechToText();
   final Set<MealTag> _selectedTags = {};
 
   String? _errorMessage;
@@ -42,6 +47,9 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
   bool _estimating = false;
   CalorieEstimate? _estimate;
   String? _estimateError;
+  String? _speechError;
+  bool _speechAvailable = false;
+  bool _speechInitialized = false;
 
   bool get _isEditing => widget.existingMeal != null;
 
@@ -53,6 +61,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
     final meal = widget.existingMeal;
     if (meal == null) return;
 
+    _nameController.text = meal.name ?? '';
     _caloriesController.text = meal.calories.round().toString();
     _selectedTags.addAll(meal.tags.where((tag) => tag.isSelectable));
     _noteController.text = meal.note ?? '';
@@ -60,6 +69,8 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
 
   @override
   void dispose() {
+    _speechToText.cancel();
+    _nameController.dispose();
     _caloriesController.dispose();
     _noteController.dispose();
     _descriptionController.dispose();
@@ -74,8 +85,6 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
         _errorMessage = _inputMode == _CalorieInputMode.ai
             ? 'Estimate calories first, or switch to manual entry.'
             : 'Enter a valid calorie amount.';
-      } else if (_selectedTags.isEmpty) {
-        _errorMessage = 'Select at least one tag.';
       } else {
         _errorMessage = null;
       }
@@ -87,6 +96,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
         .read(logMealControllerProvider.notifier)
         .submit(
           existingMeal: widget.existingMeal,
+          name: _nameController.text,
           calories: calories!,
           tags: _selectedTags.toList(),
           note: _noteController.text,
@@ -158,6 +168,88 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
     });
   }
 
+  Future<void> _toggleSpeechInput() async {
+    if (_speechToText.isListening) {
+      await _speechToText.stop();
+      if (mounted) {
+        setState(() {});
+      }
+      return;
+    }
+
+    final available = await _ensureSpeechReady();
+    if (!available) return;
+
+    setState(() {
+      _speechError = null;
+    });
+
+    await _speechToText.listen(
+      onResult: _onSpeechResult,
+      listenFor: const Duration(seconds: 25),
+      pauseFor: const Duration(seconds: 4),
+      listenOptions: SpeechListenOptions(partialResults: true),
+    );
+
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<bool> _ensureSpeechReady() async {
+    if (_speechInitialized) {
+      if (!_speechAvailable) {
+        setState(() {
+          _speechError = 'Speech input is not available on this device.';
+        });
+      }
+      return _speechAvailable;
+    }
+
+    final available = await _speechToText.initialize(
+      onError: _onSpeechError,
+      onStatus: _onSpeechStatus,
+    );
+
+    if (!mounted) return false;
+
+    setState(() {
+      _speechInitialized = true;
+      _speechAvailable = available;
+      if (!available) {
+        _speechError = 'Speech input is not available on this device.';
+      }
+    });
+
+    return available;
+  }
+
+  void _onSpeechResult(SpeechRecognitionResult result) {
+    _descriptionController.value = TextEditingValue(
+      text: result.recognizedWords,
+      selection: TextSelection.collapsed(offset: result.recognizedWords.length),
+    );
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _onSpeechError(SpeechRecognitionError error) {
+    if (!mounted) return;
+    setState(() {
+      _speechError = error.errorMsg == 'error_no_match'
+          ? 'No speech was recognised. Try again.'
+          : 'Speech input failed. ${error.errorMsg}';
+    });
+  }
+
+  void _onSpeechStatus(String status) {
+    if (!mounted) return;
+    if (status == 'done' || status == 'notListening') {
+      setState(() {});
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isLoading = ref.watch(logMealControllerProvider).isLoading;
@@ -173,14 +265,12 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
     final mediaQuery = MediaQuery.of(context);
     final footerBottomPadding =
         (mediaQuery.viewInsets.bottom > 0
-                ? mediaQuery.viewInsets.bottom
-                : mediaQuery.viewPadding.bottom) +
-            16;
+            ? mediaQuery.viewInsets.bottom
+            : mediaQuery.viewPadding.bottom) +
+        16;
 
     return Container(
-      constraints: BoxConstraints(
-        maxHeight: mediaQuery.size.height * 0.92,
-      ),
+      constraints: BoxConstraints(maxHeight: mediaQuery.size.height * 0.92),
       decoration: const BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -216,6 +306,41 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  const _SectionLabel('MEAL NAME (OPTIONAL)'),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _nameController,
+                    textCapitalization: TextCapitalization.sentences,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      color: AppColors.textPrimary,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'e.g. Salmon, chicken salad, protein shake',
+                      hintStyle: const TextStyle(
+                        color: AppColors.textDisabled,
+                        fontSize: 14,
+                      ),
+                      filled: true,
+                      fillColor: AppColors.surfaceVariant,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: AppColors.primary,
+                          width: 2,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 14,
+                        horizontal: 16,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                   const _SectionLabel('CALORIES'),
                   const SizedBox(height: 10),
                   _CalorieInputModeSelector(
@@ -235,6 +360,10 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
                       estimating: _estimating,
                       estimate: _estimate,
                       estimateError: _estimateError,
+                      speechError: _speechError,
+                      isListening: _speechToText.isListening,
+                      speechEnabled: _speechAvailable || !_speechInitialized,
+                      onToggleSpeech: _toggleSpeechInput,
                       onEstimate: _runEstimate,
                       onUse: _useEstimate,
                     )
@@ -244,7 +373,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
                   const _SectionLabel('TAGS'),
                   const SizedBox(height: 4),
                   const Text(
-                    'Select at least one. Pick any that apply.',
+                    'Pick any that clearly apply. Leave blank if none fit.',
                     style: TextStyle(
                       fontSize: 13,
                       color: AppColors.textSecondary,
@@ -303,10 +432,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
           AnimatedPadding(
             duration: const Duration(milliseconds: 180),
             curve: Curves.easeOut,
-            padding: EdgeInsets.only(
-              top: 8,
-              bottom: footerBottomPadding,
-            ),
+            padding: EdgeInsets.only(top: 8, bottom: footerBottomPadding),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -369,6 +495,10 @@ class _AiEstimatorSection extends StatelessWidget {
     required this.estimating,
     required this.estimate,
     required this.estimateError,
+    required this.speechError,
+    required this.isListening,
+    required this.speechEnabled,
+    required this.onToggleSpeech,
     required this.onEstimate,
     required this.onUse,
   });
@@ -378,6 +508,10 @@ class _AiEstimatorSection extends StatelessWidget {
   final bool estimating;
   final CalorieEstimate? estimate;
   final String? estimateError;
+  final String? speechError;
+  final bool isListening;
+  final bool speechEnabled;
+  final VoidCallback onToggleSpeech;
   final VoidCallback onEstimate;
   final VoidCallback onUse;
 
@@ -414,10 +548,7 @@ class _AiEstimatorSection extends StatelessWidget {
         TextField(
           controller: descriptionController,
           maxLines: 2,
-          style: const TextStyle(
-            fontSize: 14,
-            color: AppColors.textPrimary,
-          ),
+          style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
           decoration: InputDecoration(
             hintText: 'e.g. grilled chicken with rice and salad',
             hintStyle: const TextStyle(
@@ -432,9 +563,18 @@ class _AiEstimatorSection extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: AppColors.primary,
-                width: 2,
+              borderSide: const BorderSide(color: AppColors.primary, width: 2),
+            ),
+            suffixIcon: IconButton(
+              tooltip: isListening ? 'Stop speaking' : 'Speak meal',
+              onPressed: onToggleSpeech,
+              icon: Icon(
+                isListening ? Icons.mic : Icons.mic_none_rounded,
+                color: isListening
+                    ? AppColors.primary
+                    : speechEnabled
+                    ? AppColors.textSecondary
+                    : AppColors.textDisabled,
               ),
             ),
             contentPadding: const EdgeInsets.symmetric(
@@ -443,6 +583,13 @@ class _AiEstimatorSection extends StatelessWidget {
             ),
           ),
         ),
+        if (speechError != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            speechError!,
+            style: const TextStyle(fontSize: 13, color: AppColors.error),
+          ),
+        ],
         const SizedBox(height: 10),
         if (estimating)
           const Center(
@@ -532,10 +679,7 @@ class _AiEstimatorSection extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             estimateError!,
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppColors.error,
-            ),
+            style: const TextStyle(fontSize: 13, color: AppColors.error),
           ),
         ],
       ],
@@ -657,10 +801,7 @@ class _ManualCaloriesField extends StatelessWidget {
       children: [
         const Text(
           'Enter calories directly if you already know them.',
-          style: TextStyle(
-            fontSize: 13,
-            color: AppColors.textSecondary,
-          ),
+          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 10),
         TextField(
@@ -693,10 +834,7 @@ class _ManualCaloriesField extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: AppColors.primary,
-                width: 2,
-              ),
+              borderSide: const BorderSide(color: AppColors.primary, width: 2),
             ),
             contentPadding: const EdgeInsets.symmetric(
               vertical: 16,
@@ -746,6 +884,15 @@ class _TagsSection extends StatelessWidget {
           onToggle: onToggle,
           activeColor: AppColors.tagPositive,
           activeBg: AppColors.tagPositiveBg,
+        ),
+        const SizedBox(height: 14),
+        _TagGroup(
+          label: 'Neutral',
+          tags: MealTag.neutral,
+          selected: selected,
+          onToggle: onToggle,
+          activeColor: AppColors.tagNeutral,
+          activeBg: AppColors.tagNeutralBg,
         ),
         const SizedBox(height: 14),
         _TagGroup(

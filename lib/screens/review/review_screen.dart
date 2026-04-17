@@ -29,7 +29,7 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Review')),
+      appBar: AppBar(title: const Text('Calendar')),
       body: periodsAsync.when(
         data: (periods) {
           final activePeriods = _mode == _ReviewMode.month
@@ -183,24 +183,25 @@ class _ReviewHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          'Week and month view',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
+        const Expanded(
+          child: Text(
+            'Progress Calendar',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
           ),
         ),
-        SizedBox(height: 8),
-        Text(
-          'Each day shows whether calories landed on track, close, or off track.',
-          style: TextStyle(
-            fontSize: 15,
+        IconButton(
+          tooltip: 'What is this screen for?',
+          onPressed: () => _showReviewInfoDialog(context),
+          icon: const Icon(
+            Icons.info_outline_rounded,
             color: AppColors.textSecondary,
-            height: 1.4,
           ),
         ),
       ],
@@ -314,17 +315,26 @@ class _ReviewLegend extends StatelessWidget {
         _LegendChip(label: 'Green', color: AppColors.veryGood),
         _LegendChip(label: 'Yellow', color: AppColors.bad),
         _LegendChip(label: 'Red', color: AppColors.veryBad),
-        _LegendChip(label: 'No data', color: AppColors.textSecondary),
+        _LegendChip(
+          label: 'No data',
+          color: AppColors.textSecondary,
+          isHollow: true,
+        ),
       ],
     );
   }
 }
 
 class _LegendChip extends StatelessWidget {
-  const _LegendChip({required this.label, required this.color});
+  const _LegendChip({
+    required this.label,
+    required this.color,
+    this.isHollow = false,
+  });
 
   final String label;
   final Color color;
+  final bool isHollow;
 
   @override
   Widget build(BuildContext context) {
@@ -340,7 +350,11 @@ class _LegendChip extends StatelessWidget {
           Container(
             width: 10,
             height: 10,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: isHollow ? Colors.transparent : color,
+              shape: BoxShape.circle,
+              border: Border.all(color: color),
+            ),
           ),
           const SizedBox(width: 8),
           Text(
@@ -513,11 +527,14 @@ class _ReviewDayCell extends StatelessWidget {
     final backgroundColor = summary == null
         ? AppColors.surface
         : statusColor.withValues(alpha: 0.14);
+    final textColor = summary == null ? AppColors.textSecondary : statusColor;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: summary == null ? null : () => _showReviewDaySheet(context, summary!),
+        onTap: summary == null
+            ? null
+            : () => _showReviewDaySheet(context, summary!),
         borderRadius: BorderRadius.circular(16),
         child: Ink(
           decoration: BoxDecoration(
@@ -537,52 +554,15 @@ class _ReviewDayCell extends StatelessWidget {
                   ]
                 : null,
           ),
-          child: Stack(
-            children: [
-              Positioned(
-                top: 8,
-                left: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isToday ? AppColors.primary : Colors.transparent,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    '${date.day}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: isToday ? AppColors.surface : AppColors.textPrimary,
-                    ),
-                  ),
-                ),
+          child: Center(
+            child: Text(
+              '${date.day}',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: textColor,
               ),
-              if (summary != null)
-                Center(
-                  child: Icon(
-                    _statusIcon(summary!.status),
-                    size: 18,
-                    color: statusColor,
-                  ),
-                ),
-              if (summary != null)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Text(
-                    '${summary!.totalCalories}',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: statusColor,
-                    ),
-                  ),
-                ),
-            ],
+            ),
           ),
         ),
       ),
@@ -654,6 +634,28 @@ class _ReviewErrorState extends StatelessWidget {
       ),
     );
   }
+}
+
+void _showReviewInfoDialog(BuildContext context) {
+  showDialog<void>(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('About calendar review'),
+        content: const Text(
+          'This screen shows your logged days in a weekly or monthly calendar. '
+          'Each day is colored by how close your calories were to target. '
+          'Tap any colored day to open its details.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      );
+    },
+  );
 }
 
 void _showReviewDaySheet(BuildContext context, DailySummary summary) {
@@ -895,14 +897,6 @@ Color _statusColor(DailyStatus status) {
     DailyStatus.green => AppColors.veryGood,
     DailyStatus.yellow => AppColors.bad,
     DailyStatus.red => AppColors.veryBad,
-  };
-}
-
-IconData _statusIcon(DailyStatus status) {
-  return switch (status) {
-    DailyStatus.green => Icons.check_circle_rounded,
-    DailyStatus.yellow => Icons.remove_circle_outline_rounded,
-    DailyStatus.red => Icons.warning_amber_rounded,
   };
 }
 
