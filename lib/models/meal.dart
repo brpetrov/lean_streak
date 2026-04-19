@@ -25,12 +25,7 @@ enum MealTag {
   alcohol('alcohol', 'Alcohol', MealTagTone.unhealthy, isSelectable: false),
   overate('overate', 'Overate', MealTagTone.unhealthy, isSelectable: false);
 
-  const MealTag(
-    this.value,
-    this.label,
-    this.tone, {
-    this.isSelectable = true,
-  });
+  const MealTag(this.value, this.label, this.tone, {this.isSelectable = true});
 
   final String value;
   final String label;

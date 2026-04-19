@@ -271,7 +271,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
 
     return Container(
       constraints: BoxConstraints(maxHeight: mediaQuery.size.height * 0.92),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -299,25 +299,25 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
                 children: [
                   Text(
                     _isEditing ? 'Edit Meal' : 'Log Meal',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: 24),
                   const _SectionLabel('MEAL NAME (OPTIONAL)'),
-                  const SizedBox(height: 10),
+                  SizedBox(height: 10),
                   TextField(
                     controller: _nameController,
                     textCapitalization: TextCapitalization.sentences,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       color: AppColors.textPrimary,
                     ),
                     decoration: InputDecoration(
                       hintText: 'e.g. Salmon, chicken salad, protein shake',
-                      hintStyle: const TextStyle(
+                      hintStyle: TextStyle(
                         color: AppColors.textDisabled,
                         fontSize: 14,
                       ),
@@ -329,7 +329,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
+                        borderSide: BorderSide(
                           color: AppColors.primary,
                           width: 2,
                         ),
@@ -340,9 +340,9 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: 24),
                   const _SectionLabel('CALORIES'),
-                  const SizedBox(height: 10),
+                  SizedBox(height: 10),
                   _CalorieInputModeSelector(
                     selectedMode: effectiveInputMode,
                     aiEnabled: !limitReached,
@@ -352,7 +352,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
                       _estimateError = null;
                     }),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 12),
                   if (effectiveInputMode == _CalorieInputMode.ai)
                     _AiEstimatorSection(
                       remaining: remaining,
@@ -369,17 +369,17 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
                     )
                   else
                     _ManualCaloriesField(controller: _caloriesController),
-                  const SizedBox(height: 24),
+                  SizedBox(height: 24),
                   const _SectionLabel('TAGS'),
-                  const SizedBox(height: 4),
-                  const Text(
+                  SizedBox(height: 4),
+                  Text(
                     'Pick any that clearly apply. Leave blank if none fit.',
                     style: TextStyle(
                       fontSize: 13,
                       color: AppColors.textSecondary,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 12),
                   _TagsSection(
                     selected: _selectedTags,
                     onToggle: (tag) => setState(() {
@@ -390,19 +390,19 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
                       }
                     }),
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: 24),
                   const _SectionLabel('NOTE (OPTIONAL)'),
-                  const SizedBox(height: 10),
+                  SizedBox(height: 10),
                   TextField(
                     controller: _noteController,
                     maxLines: 2,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       color: AppColors.textPrimary,
                     ),
                     decoration: InputDecoration(
                       hintText: 'Add anything useful about this meal',
-                      hintStyle: const TextStyle(
+                      hintStyle: TextStyle(
                         color: AppColors.textDisabled,
                         fontSize: 14,
                       ),
@@ -414,7 +414,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
+                        borderSide: BorderSide(
                           color: AppColors.primary,
                           width: 2,
                         ),
@@ -445,13 +445,10 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
                     ),
                     child: Text(
                       _errorMessage!,
-                      style: const TextStyle(
-                        color: AppColors.error,
-                        fontSize: 14,
-                      ),
+                      style: TextStyle(color: AppColors.error, fontSize: 14),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 12),
                 ],
                 FilledButton(
                   onPressed: isLoading ? null : _submit,
@@ -463,7 +460,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
                     ),
                   ),
                   child: isLoading
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 22,
                           height: 22,
                           child: CircularProgressIndicator(
@@ -473,7 +470,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
                         )
                       : Text(
                           _isEditing ? 'Update Meal' : 'Save Meal',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w600,
                           ),
@@ -522,12 +519,12 @@ class _AiEstimatorSection extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Icon(
+            Icon(
               Icons.auto_awesome_rounded,
               size: 16,
               color: AppColors.primary,
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
@@ -536,25 +533,19 @@ class _AiEstimatorSection extends StatelessWidget {
               ),
               child: Text(
                 '$remaining left today',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textSecondary,
-                ),
+                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         TextField(
           controller: descriptionController,
           maxLines: 2,
-          style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+          style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
           decoration: InputDecoration(
             hintText: 'e.g. grilled chicken with rice and salad',
-            hintStyle: const TextStyle(
-              color: AppColors.textDisabled,
-              fontSize: 13,
-            ),
+            hintStyle: TextStyle(color: AppColors.textDisabled, fontSize: 13),
             filled: true,
             fillColor: AppColors.surfaceVariant,
             border: OutlineInputBorder(
@@ -563,7 +554,7 @@ class _AiEstimatorSection extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.primary, width: 2),
+              borderSide: BorderSide(color: AppColors.primary, width: 2),
             ),
             suffixIcon: IconButton(
               tooltip: isListening ? 'Stop speaking' : 'Speak meal',
@@ -584,15 +575,15 @@ class _AiEstimatorSection extends StatelessWidget {
           ),
         ),
         if (speechError != null) ...[
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(
             speechError!,
-            style: const TextStyle(fontSize: 13, color: AppColors.error),
+            style: TextStyle(fontSize: 13, color: AppColors.error),
           ),
         ],
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         if (estimating)
-          const Center(
+          Center(
             child: SizedBox(
               width: 22,
               height: 22,
@@ -613,13 +604,13 @@ class _AiEstimatorSection extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text(
+            child: Text(
               'Estimate calories',
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
         if (estimate != null) ...[
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -635,16 +626,16 @@ class _AiEstimatorSection extends StatelessWidget {
                     children: [
                       Text(
                         '~${estimate!.kcal} kcal',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
                           color: AppColors.tagPositive,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: 4),
                       Text(
                         estimate!.note,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary,
                         ),
@@ -652,7 +643,7 @@ class _AiEstimatorSection extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 TextButton(
                   onPressed: onUse,
                   style: TextButton.styleFrom(
@@ -666,7 +657,7 @@ class _AiEstimatorSection extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Use this',
                     style: TextStyle(fontWeight: FontWeight.w600),
                   ),
@@ -676,10 +667,10 @@ class _AiEstimatorSection extends StatelessWidget {
           ),
         ],
         if (estimateError != null) ...[
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           Text(
             estimateError!,
-            style: const TextStyle(fontSize: 13, color: AppColors.error),
+            style: TextStyle(fontSize: 13, color: AppColors.error),
           ),
         ],
       ],
@@ -711,7 +702,7 @@ class _CalorieInputModeSelector extends StatelessWidget {
             onPressed: () => onChanged(_CalorieInputMode.ai),
           ),
         ),
-        const SizedBox(width: 10),
+        SizedBox(width: 10),
         Expanded(
           child: _InputModeButton(
             label: 'Enter Manually',
@@ -769,7 +760,7 @@ class _InputModeButton extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, size: 16, color: foregroundColor),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Flexible(
                 child: Text(
                   enabled ? label : 'AI limit reached',
@@ -799,30 +790,30 @@ class _ManualCaloriesField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Enter calories directly if you already know them.',
           style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         TextField(
           controller: controller,
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 36,
             fontWeight: FontWeight.w700,
             color: AppColors.textPrimary,
           ),
           decoration: InputDecoration(
             hintText: '0',
-            hintStyle: const TextStyle(
+            hintStyle: TextStyle(
               fontSize: 36,
               fontWeight: FontWeight.w700,
               color: AppColors.textDisabled,
             ),
             suffixText: 'kcal',
-            suffixStyle: const TextStyle(
+            suffixStyle: TextStyle(
               fontSize: 15,
               color: AppColors.textSecondary,
             ),
@@ -834,7 +825,7 @@ class _ManualCaloriesField extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.primary, width: 2),
+              borderSide: BorderSide(color: AppColors.primary, width: 2),
             ),
             contentPadding: const EdgeInsets.symmetric(
               vertical: 16,
@@ -856,7 +847,7 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 11,
         fontWeight: FontWeight.w700,
         color: AppColors.textSecondary,
@@ -885,7 +876,7 @@ class _TagsSection extends StatelessWidget {
           activeColor: AppColors.tagPositive,
           activeBg: AppColors.tagPositiveBg,
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         _TagGroup(
           label: 'Neutral',
           tags: MealTag.neutral,
@@ -894,7 +885,7 @@ class _TagsSection extends StatelessWidget {
           activeColor: AppColors.tagNeutral,
           activeBg: AppColors.tagNeutralBg,
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         _TagGroup(
           label: 'Unhealthy',
           tags: MealTag.warning,
@@ -938,7 +929,7 @@ class _TagGroup extends StatelessWidget {
             color: activeColor,
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: 8),
         Wrap(
           spacing: 8,
           runSpacing: 6,

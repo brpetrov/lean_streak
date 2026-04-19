@@ -11,20 +11,17 @@ class AiUsageRepository {
 
   static const int dailyLimit = 20;
 
-  DocumentReference<Map<String, dynamic>> _doc(String uid, String date) => _db
-      .collection('users')
-      .doc(uid)
-      .collection('ai_usage')
-      .doc(date);
+  DocumentReference<Map<String, dynamic>> _doc(String uid, String date) =>
+      _db.collection('users').doc(uid).collection('ai_usage').doc(date);
 
   /// Streams today's usage count. Emits 0 if no document exists yet.
-  Stream<int> watchCount(String uid, String date) =>
-      _doc(uid, date).snapshots().map((snap) =>
-          snap.exists ? ((snap.data()?['count'] as int?) ?? 0) : 0);
+  Stream<int> watchCount(String uid, String date) => _doc(uid, date)
+      .snapshots()
+      .map((snap) => snap.exists ? ((snap.data()?['count'] as int?) ?? 0) : 0);
 
   /// Atomically increments the usage count for [date].
-  Future<void> increment(String uid, String date) => _doc(uid, date).set(
-        {'count': FieldValue.increment(1)},
-        SetOptions(merge: true),
-      );
+  Future<void> increment(String uid, String date) => _doc(
+    uid,
+    date,
+  ).set({'count': FieldValue.increment(1)}, SetOptions(merge: true));
 }

@@ -59,11 +59,7 @@ final periodReviewProvider = FutureProvider.autoDispose
           );
       final checkIns = await ref
           .watch(checkInRepositoryProvider)
-          .fetchCheckInsInRange(
-            uid,
-            startDate: startDate,
-            endDate: endDate,
-          );
+          .fetchCheckInsInRange(uid, startDate: startDate, endDate: endDate);
 
       return ref
           .watch(periodReviewServiceProvider)

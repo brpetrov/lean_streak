@@ -25,7 +25,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _targetWeightCtrl = TextEditingController();
 
   Gender? _gender;
-  ActivityLevel _activityLevel = ActivityLevel.light;
+  ActivityLevel _activityLevel = ActivityLevel.sedentary;
   WeightLossPace _weightLossPace = WeightLossPace.moderate;
 
   @override
@@ -149,8 +149,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // ── Header ─────────────────────────────────────────────
-                const SizedBox(height: 16),
-                const Text(
+                SizedBox(height: 16),
+                Text(
                   'Let\'s get started',
                   style: TextStyle(
                     fontSize: 26,
@@ -159,15 +159,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     letterSpacing: -0.5,
                   ),
                 ),
-                const SizedBox(height: 6),
-                const Text(
+                SizedBox(height: 6),
+                Text(
                   'Tell us about yourself so we can build your personal plan.',
                   style: TextStyle(
                     fontSize: 15,
                     color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: 32),
 
                 // ── About you ──────────────────────────────────────────
                 const _SectionLabel('ABOUT YOU'),
@@ -175,7 +175,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   controller: _nameCtrl,
                   textCapitalization: TextCapitalization.words,
                   textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Name',
                     prefixIcon: Icon(Icons.person_outline_rounded),
                   ),
@@ -183,13 +183,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       ? 'Please enter your name.'
                       : null,
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 TextFormField(
                   controller: _ageCtrl,
                   keyboardType: TextInputType.number,
                   textInputAction: TextInputAction.next,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Age',
                     prefixIcon: Icon(Icons.cake_outlined),
                   ),
@@ -200,15 +200,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 14),
-                const Text(
+                SizedBox(height: 14),
+                Text(
                   'Gender',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 Row(
                   children: [
                     _GenderButton(
@@ -216,13 +216,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       selected: _gender == Gender.male,
                       onTap: () => setState(() => _gender = Gender.male),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     _GenderButton(
                       label: 'Female',
                       selected: _gender == Gender.female,
                       onTap: () => setState(() => _gender = Gender.female),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     _GenderButton(
                       label: 'Other',
                       selected: _gender == Gender.other,
@@ -230,7 +230,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 28),
+                SizedBox(height: 28),
 
                 // ── Your body ──────────────────────────────────────────
                 const _SectionLabel('YOUR BODY'),
@@ -248,7 +248,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                             RegExp(r'^\d{0,3}\.?\d{0,1}'),
                           ),
                         ],
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Height',
                           suffixText: 'cm',
                         ),
@@ -260,7 +260,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         },
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Expanded(
                       child: TextFormField(
                         controller: _currentWeightCtrl,
@@ -273,7 +273,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                             RegExp(r'^\d{0,3}\.?\d{0,1}'),
                           ),
                         ],
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Current weight',
                           suffixText: 'kg',
                         ),
@@ -287,18 +287,18 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 28),
+                SizedBox(height: 28),
 
                 // ── Your goal ──────────────────────────────────────────
                 const _SectionLabel('YOUR GOAL'),
-                const Text(
+                Text(
                   'Choose how quickly you want to lose weight, or maintain instead.',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 ...WeightLossPace.values.map(
                   (pace) => Padding(
                     padding: const EdgeInsets.only(bottom: 10),
@@ -309,7 +309,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 if (_weightLossPace != WeightLossPace.maintain) ...[
                   TextFormField(
                     controller: _targetWeightCtrl,
@@ -322,7 +322,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         RegExp(r'^\d{0,3}\.?\d{0,1}'),
                       ),
                     ],
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Target weight',
                       suffixText: 'kg',
                       prefixIcon: Icon(Icons.flag_outlined),
@@ -349,7 +349,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: AppColors.divider),
                     ),
-                    child: const Text(
+                    child: Text(
                       'We will aim for a daily calorie target close to your maintenance calories.',
                       style: TextStyle(
                         fontSize: 14,
@@ -359,18 +359,18 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     ),
                   ),
                 ],
-                const SizedBox(height: 28),
+                SizedBox(height: 28),
 
                 // ── Activity level ─────────────────────────────────────
                 const _SectionLabel('HOW ACTIVE ARE YOU?'),
-                const Text(
+                Text(
                   'Used to estimate how many calories you burn each day.',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 ...ActivityLevel.values.map(
                   (level) => Padding(
                     padding: const EdgeInsets.only(bottom: 10),
@@ -381,14 +381,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                SizedBox(height: 20),
 
                 // ── Weight loss pace ───────────────────────────────────
 
                 // ── Plan preview ───────────────────────────────────────
                 if (preview != null) ...[
                   _PlanPreviewCard(preview: preview),
-                  const SizedBox(height: 20),
+                  SizedBox(height: 20),
                 ],
 
                 // ── Submit ─────────────────────────────────────────────
@@ -397,7 +397,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   child: ElevatedButton(
                     onPressed: isLoading ? null : _submit,
                     child: isLoading
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 22,
                             height: 22,
                             child: CircularProgressIndicator(
@@ -405,7 +405,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                               color: Colors.white,
                             ),
                           )
-                        : const Text(
+                        : Text(
                             'Get My Plan',
                             style: TextStyle(
                               fontSize: 16,
@@ -414,7 +414,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           ),
                   ),
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: 32),
               ],
             ),
           ),
@@ -462,7 +462,7 @@ class _SectionLabel extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w700,
           color: AppColors.textSecondary,
@@ -501,7 +501,9 @@ class _GenderButton extends StatelessWidget {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: selected ? Colors.white : AppColors.textSecondary,
+              color: selected
+                  ? Theme.of(context).colorScheme.onPrimary
+                  : AppColors.textSecondary,
             ),
           ),
         ),
@@ -523,23 +525,28 @@ class _ActivityCard extends StatelessWidget {
   final VoidCallback onTap;
 
   static String _title(ActivityLevel l) => switch (l) {
-    ActivityLevel.light => 'Mostly sedentary',
-    ActivityLevel.medium => 'Lightly active',
-    ActivityLevel.hard => 'Very active',
+    ActivityLevel.sedentary => 'Sedentary',
+    ActivityLevel.lightlyActive => 'Lightly active',
+    ActivityLevel.moderatelyActive => 'Moderately active',
+    ActivityLevel.veryActive => 'Very active',
   };
 
   static String _description(ActivityLevel l) => switch (l) {
-    ActivityLevel.light => 'Desk job, little exercise, low daily movement.',
-    ActivityLevel.medium =>
-      'Some walking or light exercise a few times per week.',
-    ActivityLevel.hard =>
-      'Regular training, physical job, or high daily movement.',
+    ActivityLevel.sedentary =>
+      'Desk job, low steps, little structured exercise.',
+    ActivityLevel.lightlyActive =>
+      'Some walking, light exercise 1-3 days per week.',
+    ActivityLevel.moderatelyActive =>
+      'Regular training 3-5 days per week or active daily routine.',
+    ActivityLevel.veryActive =>
+      'Hard training 6-7 days per week, physical job, or high movement.',
   };
 
   static IconData _icon(ActivityLevel l) => switch (l) {
-    ActivityLevel.light => Icons.weekend_outlined,
-    ActivityLevel.medium => Icons.directions_walk_outlined,
-    ActivityLevel.hard => Icons.fitness_center_outlined,
+    ActivityLevel.sedentary => Icons.weekend_outlined,
+    ActivityLevel.lightlyActive => Icons.directions_walk_outlined,
+    ActivityLevel.moderatelyActive => Icons.directions_run_outlined,
+    ActivityLevel.veryActive => Icons.fitness_center_outlined,
   };
 
   @override
@@ -640,7 +647,7 @@ class _SelectionCard extends StatelessWidget {
               color: selected ? AppColors.primary : AppColors.textSecondary,
               size: 22,
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -655,10 +662,10 @@ class _SelectionCard extends StatelessWidget {
                           : AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  SizedBox(height: 2),
                   Text(
                     description,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       color: AppColors.textSecondary,
                     ),
@@ -667,7 +674,7 @@ class _SelectionCard extends StatelessWidget {
               ),
             ),
             if (selected)
-              const Icon(
+              Icon(
                 Icons.check_circle_rounded,
                 color: AppColors.primary,
                 size: 20,
@@ -722,7 +729,7 @@ class _PlanPreviewCard extends StatelessWidget {
           Row(
             children: [
               Icon(Icons.insights_rounded, color: _color, size: 18),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Text(
                 'Your plan',
                 style: TextStyle(
@@ -733,7 +740,7 @@ class _PlanPreviewCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -753,7 +760,7 @@ class _PlanPreviewCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -764,7 +771,7 @@ class _PlanPreviewCard extends StatelessWidget {
                 color: _color,
                 size: 16,
               ),
-              const SizedBox(width: 6),
+              SizedBox(width: 6),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -777,17 +784,17 @@ class _PlanPreviewCard extends StatelessWidget {
                         color: _color,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    SizedBox(height: 2),
                     Text(
                       _paceMessage,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,
                       ),
                     ),
                     if (preview.clamped) ...[
-                      const SizedBox(height: 4),
-                      const Text(
+                      SizedBox(height: 4),
+                      Text(
                         'Calorie target set to safe minimum floor.',
                         style: TextStyle(
                           fontSize: 12,
@@ -819,12 +826,12 @@ class _Stat extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
         ),
-        const SizedBox(height: 2),
+        SizedBox(height: 2),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
             color: AppColors.textPrimary,

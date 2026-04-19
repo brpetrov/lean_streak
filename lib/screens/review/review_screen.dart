@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:lean_streak/core/constants/app_colors.dart';
 import 'package:lean_streak/models/daily_summary.dart';
 import 'package:lean_streak/providers/review_provider.dart';
+import 'package:lean_streak/widgets/app_frame.dart';
+import 'package:lean_streak/widgets/responsive_page.dart';
 
 class ReviewScreen extends ConsumerStatefulWidget {
   const ReviewScreen({super.key});
@@ -27,9 +29,9 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
   Widget build(BuildContext context) {
     final periodsAsync = ref.watch(reviewPeriodsProvider);
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Calendar')),
+    return AppFrame(
+      title: 'Review',
+      currentTab: AppFrameTab.review,
       body: periodsAsync.when(
         data: (periods) {
           final activePeriods = _mode == _ReviewMode.month
@@ -45,16 +47,25 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
             child: activePeriods.isEmpty
                 ? ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: EdgeInsets.fromLTRB(
-                      20,
-                      20,
-                      20,
-                      MediaQuery.of(context).padding.bottom + 28,
-                    ),
-                    children: const [
-                      _ReviewHeader(),
-                      SizedBox(height: 20),
-                      _ReviewEmptyState(),
+                    padding: EdgeInsets.zero,
+                    children: [
+                      ResponsivePage(
+                        maxWidth: 760,
+                        padding: EdgeInsets.fromLTRB(
+                          20,
+                          20,
+                          20,
+                          MediaQuery.of(context).padding.bottom + 28,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _ReviewHeader(),
+                            SizedBox(height: 20),
+                            _ReviewEmptyState(),
+                          ],
+                        ),
+                      ),
                     ],
                   )
                 : _ReviewContent(
@@ -78,9 +89,8 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
                   ),
           );
         },
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
+        loading: () =>
+            Center(child: CircularProgressIndicator(color: AppColors.primary)),
         error: (_, _) => const _ReviewErrorState(),
       ),
     );
@@ -122,56 +132,71 @@ class _ReviewContent extends ConsumerWidget {
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(
-        20,
-        20,
-        20,
-        MediaQuery.of(context).padding.bottom + 28,
-      ),
+      padding: EdgeInsets.zero,
       children: [
-        const _ReviewHeader(),
-        const SizedBox(height: 20),
-        _ReviewModeSelector(mode: mode, onModeChanged: onModeChanged),
-        const SizedBox(height: 16),
-        _ReviewPeriodBar(
-          label: _periodLabel(focusedDate, mode),
-          canGoBack: currentIndex > 0,
-          canGoForward:
-              currentIndex >= 0 && currentIndex < activePeriods.length - 1,
-          showTodayButton: currentPeriodIndex != -1,
-          isCurrentPeriod: currentPeriodIndex == currentIndex,
-          onPrevious: currentIndex > 0
-              ? () => onFocusedDateChanged(activePeriods[currentIndex - 1])
-              : null,
-          onNext: currentIndex >= 0 && currentIndex < activePeriods.length - 1
-              ? () => onFocusedDateChanged(activePeriods[currentIndex + 1])
-              : null,
-          onToday: currentPeriodIndex == -1
-              ? null
-              : () => onFocusedDateChanged(activePeriods[currentPeriodIndex]),
-        ),
-        const SizedBox(height: 12),
-        const _ReviewLegend(),
-        const SizedBox(height: 20),
-        summariesAsync.when(
-          data: (summariesByDate) {
-            return mode == _ReviewMode.month
-                ? _MonthCalendar(
-                    month: focusedDate,
-                    summariesByDate: summariesByDate,
-                  )
-                : _WeekCalendar(
-                    weekDate: focusedDate,
-                    summariesByDate: summariesByDate,
-                  );
-          },
-          loading: () => const Padding(
-            padding: EdgeInsets.only(top: 80),
-            child: Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            ),
+        ResponsivePage(
+          maxWidth: 760,
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            MediaQuery.of(context).padding.bottom + 28,
           ),
-          error: (_, _) => const _ReviewErrorState(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const _ReviewHeader(),
+              SizedBox(height: 20),
+              _ReviewModeSelector(mode: mode, onModeChanged: onModeChanged),
+              SizedBox(height: 16),
+              _ReviewPeriodBar(
+                label: _periodLabel(focusedDate, mode),
+                canGoBack: currentIndex > 0,
+                canGoForward:
+                    currentIndex >= 0 &&
+                    currentIndex < activePeriods.length - 1,
+                showTodayButton: currentPeriodIndex != -1,
+                isCurrentPeriod: currentPeriodIndex == currentIndex,
+                onPrevious: currentIndex > 0
+                    ? () =>
+                          onFocusedDateChanged(activePeriods[currentIndex - 1])
+                    : null,
+                onNext:
+                    currentIndex >= 0 && currentIndex < activePeriods.length - 1
+                    ? () =>
+                          onFocusedDateChanged(activePeriods[currentIndex + 1])
+                    : null,
+                onToday: currentPeriodIndex == -1
+                    ? null
+                    : () => onFocusedDateChanged(
+                        activePeriods[currentPeriodIndex],
+                      ),
+              ),
+              SizedBox(height: 12),
+              const _ReviewLegend(),
+              SizedBox(height: 20),
+              summariesAsync.when(
+                data: (summariesByDate) {
+                  return mode == _ReviewMode.month
+                      ? _MonthCalendar(
+                          month: focusedDate,
+                          summariesByDate: summariesByDate,
+                        )
+                      : _WeekCalendar(
+                          weekDate: focusedDate,
+                          summariesByDate: summariesByDate,
+                        );
+                },
+                loading: () => Padding(
+                  padding: EdgeInsets.only(top: 80),
+                  child: Center(
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  ),
+                ),
+                error: (_, _) => const _ReviewErrorState(),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -186,7 +211,7 @@ class _ReviewHeader extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const Expanded(
+        Expanded(
           child: Text(
             'Progress Calendar',
             style: TextStyle(
@@ -199,7 +224,7 @@ class _ReviewHeader extends StatelessWidget {
         IconButton(
           tooltip: 'What is this screen for?',
           onPressed: () => _showReviewInfoDialog(context),
-          icon: const Icon(
+          icon: Icon(
             Icons.info_outline_rounded,
             color: AppColors.textSecondary,
           ),
@@ -219,7 +244,7 @@ class _ReviewModeSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     return SegmentedButton<_ReviewMode>(
       showSelectedIcon: false,
-      segments: const [
+      segments: [
         ButtonSegment(value: _ReviewMode.week, label: Text('Week')),
         ButtonSegment(value: _ReviewMode.month, label: Text('Month')),
       ],
@@ -262,13 +287,13 @@ class _ReviewPeriodBar extends StatelessWidget {
         children: [
           IconButton(
             onPressed: canGoBack ? onPrevious : null,
-            icon: const Icon(Icons.chevron_left_rounded),
+            icon: Icon(Icons.chevron_left_rounded),
           ),
           Expanded(
             child: Text(
               label,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
@@ -279,7 +304,7 @@ class _ReviewPeriodBar extends StatelessWidget {
             OutlinedButton(
               onPressed: isCurrentPeriod ? null : onToday,
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.divider),
+                side: BorderSide(color: AppColors.divider),
                 minimumSize: const Size(0, 40),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 padding: const EdgeInsets.symmetric(
@@ -291,11 +316,11 @@ class _ReviewPeriodBar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text('Today'),
+              child: Text('Today'),
             ),
           IconButton(
             onPressed: canGoForward ? onNext : null,
-            icon: const Icon(Icons.chevron_right_rounded),
+            icon: Icon(Icons.chevron_right_rounded),
           ),
         ],
       ),
@@ -311,7 +336,7 @@ class _ReviewLegend extends StatelessWidget {
     return Wrap(
       spacing: 10,
       runSpacing: 10,
-      children: const [
+      children: [
         _LegendChip(label: 'Green', color: AppColors.veryGood),
         _LegendChip(label: 'Yellow', color: AppColors.bad),
         _LegendChip(label: 'Red', color: AppColors.veryBad),
@@ -356,10 +381,10 @@ class _LegendChip extends StatelessWidget {
               border: Border.all(color: color),
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
@@ -385,7 +410,7 @@ class _WeekCalendar extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'This week',
           style: TextStyle(
             fontSize: 20,
@@ -393,9 +418,9 @@ class _WeekCalendar extends StatelessWidget {
             color: AppColors.textPrimary,
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         _WeekdayHeader(days: days, compact: false),
-        const SizedBox(height: 8),
+        SizedBox(height: 8),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -444,7 +469,7 @@ class _MonthCalendar extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'This month',
           style: TextStyle(
             fontSize: 20,
@@ -452,9 +477,9 @@ class _MonthCalendar extends StatelessWidget {
             color: AppColors.textPrimary,
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         const _WeekdayHeader(),
-        const SizedBox(height: 8),
+        SizedBox(height: 8),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -488,7 +513,7 @@ class _WeekdayHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final labels = days == null
-        ? const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
         : days!
               .map((day) => DateFormat(compact ? 'E' : 'EEE').format(day))
               .toList();
@@ -499,7 +524,7 @@ class _WeekdayHeader extends StatelessWidget {
           child: Text(
             label,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
               color: AppColors.textSecondary,
@@ -545,7 +570,7 @@ class _ReviewDayCell extends StatelessWidget {
               width: isToday ? 1.5 : 1,
             ),
             boxShadow: isToday
-                ? const [
+                ? [
                     BoxShadow(
                       color: AppColors.shadow,
                       blurRadius: 10,
@@ -582,7 +607,7 @@ class _ReviewEmptyState extends StatelessWidget {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: const Column(
+      child: Column(
         children: [
           Icon(
             Icons.calendar_month_rounded,
@@ -627,7 +652,7 @@ class _ReviewErrorState extends StatelessWidget {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: const Text(
+      child: Text(
         'Could not load review data right now.',
         textAlign: TextAlign.center,
         style: TextStyle(fontSize: 15, color: AppColors.textSecondary),
@@ -641,8 +666,8 @@ void _showReviewInfoDialog(BuildContext context) {
     context: context,
     builder: (context) {
       return AlertDialog(
-        title: const Text('About calendar review'),
-        content: const Text(
+        title: Text('About calendar review'),
+        content: Text(
           'This screen shows your logged days in a weekly or monthly calendar. '
           'Each day is colored by how close your calories were to target. '
           'Tap any colored day to open its details.',
@@ -650,7 +675,7 @@ void _showReviewInfoDialog(BuildContext context) {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
+            child: Text('Close'),
           ),
         ],
       );
@@ -680,13 +705,13 @@ void _showReviewDaySheet(BuildContext context, DailySummary summary) {
                   date == null
                       ? summary.date
                       : DateFormat('EEEE, d MMMM yyyy').format(date),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -704,7 +729,7 @@ void _showReviewDaySheet(BuildContext context, DailySummary summary) {
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                SizedBox(height: 20),
                 Wrap(
                   spacing: 12,
                   runSpacing: 12,
@@ -728,18 +753,18 @@ void _showReviewDaySheet(BuildContext context, DailySummary summary) {
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
                 Text(
                   _statusDescription(summary),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     color: AppColors.textSecondary,
                     height: 1.5,
                   ),
                 ),
                 if (summary.tagCounts.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  const Text(
+                  SizedBox(height: 24),
+                  Text(
                     'Tag totals',
                     style: TextStyle(
                       fontSize: 18,
@@ -747,7 +772,7 @@ void _showReviewDaySheet(BuildContext context, DailySummary summary) {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -763,7 +788,7 @@ void _showReviewDaySheet(BuildContext context, DailySummary summary) {
                         ),
                         child: Text(
                           '${_formatTagLabel(entry.key)} (${entry.value})',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: AppColors.textSecondary,
@@ -807,12 +832,9 @@ class _DetailMetricCard extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(
             value,
             style: TextStyle(

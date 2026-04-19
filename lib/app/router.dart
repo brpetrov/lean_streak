@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:lean_streak/providers/auth_provider.dart';
 import 'package:lean_streak/providers/user_profile_provider.dart';
+import 'package:lean_streak/screens/account/account_settings_screen.dart';
 import 'package:lean_streak/screens/auth/auth_screen.dart';
 import 'package:lean_streak/screens/dashboard/dashboard_screen.dart';
 import 'package:lean_streak/screens/onboarding/onboarding_screen.dart';
@@ -26,6 +27,7 @@ class AppRoutes {
   static const review = '/review';
   static const summary = '/summary';
   static const profile = '/profile';
+  static const healthSettings = '/health-settings';
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +91,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutes.profile,
-        builder: (context, state) => const ProfileScreen(),
+        builder: (context, state) => const AccountSettingsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.healthSettings,
+        builder: (context, state) => const HealthSettingsScreen(),
       ),
       // Additional routes wired in later phases:
       // GoRoute(path: AppRoutes.logMeal, ...),

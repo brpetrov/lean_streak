@@ -41,7 +41,9 @@ class DailySummary {
     return calorieDelta.abs() / targetCalories;
   }
 
-  factory DailySummary.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
+  factory DailySummary.fromFirestore(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
     final data = doc.data()!;
 
     return DailySummary(
@@ -50,8 +52,9 @@ class DailySummary {
       targetCalories: (data['targetCalories'] as num).round(),
       calorieDelta: (data['calorieDelta'] as num).round(),
       mealCount: data['mealCount'] as int,
-      tagCounts: (data['tagCounts'] as Map<String, dynamic>? ?? const {})
-          .map((key, value) => MapEntry(key, (value as num).round())),
+      tagCounts: (data['tagCounts'] as Map<String, dynamic>? ?? const {}).map(
+        (key, value) => MapEntry(key, (value as num).round()),
+      ),
       status: _statusFromFirestore(data),
       updatedAt: (data['updatedAt'] as Timestamp).toDate(),
     );

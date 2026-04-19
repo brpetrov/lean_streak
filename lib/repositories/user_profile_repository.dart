@@ -33,9 +33,8 @@ class UserProfileRepository {
   /// Partially updates the user's profile document.
   /// Always stamps [updatedAt] via server timestamp.
   Future<void> updateProfile(String uid, Map<String, dynamic> fields) {
-    return _doc(uid).update({
-      ...fields,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    return _doc(
+      uid,
+    ).update({...fields, 'updatedAt': FieldValue.serverTimestamp()});
   }
 }

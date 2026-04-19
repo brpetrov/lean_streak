@@ -31,12 +31,8 @@ class MealRepository {
 
   /// Streams all meals for [uid] on [date] (yyyy-MM-dd), ordered by timestamp.
   Stream<List<Meal>> watchMealsForDate(String uid, String date) {
-    return _meals(uid)
-        .where('date', isEqualTo: date)
-        .snapshots()
-        .map((snap) {
-      final meals =
-          snap.docs.map((d) => Meal.fromFirestore(d)).toList();
+    return _meals(uid).where('date', isEqualTo: date).snapshots().map((snap) {
+      final meals = snap.docs.map((d) => Meal.fromFirestore(d)).toList();
       meals.sort((a, b) => a.timestamp.compareTo(b.timestamp));
       return meals;
     });

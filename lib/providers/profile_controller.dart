@@ -62,6 +62,7 @@ class ProfileController extends AsyncNotifier<void> {
         currentWeightKg: currentWeightKg,
         targetWeightKg: resolvedTargetWeight,
         activityLevel: activityLevel,
+        activityScaleVersion: currentActivityScaleVersion,
         weightLossPace: weightLossPace,
         targetDate: targetDate,
         bmi: bmi,

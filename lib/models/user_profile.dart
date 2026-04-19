@@ -18,16 +18,30 @@ enum Gender {
 
 /// How physically active the user is — used for TDEE calculation.
 enum ActivityLevel {
-  light('light'),
-  medium('medium'),
-  hard('hard');
+  sedentary('sedentary'),
+  lightlyActive('lightly_active'),
+  moderatelyActive('moderately_active'),
+  veryActive('very_active');
 
   const ActivityLevel(this.value);
   final String value;
 
-  static ActivityLevel fromString(String s) =>
-      ActivityLevel.values.firstWhere((e) => e.value == s);
+  static ActivityLevel fromString(String s) {
+    return switch (s) {
+      'sedentary' || 'light' => ActivityLevel.sedentary,
+      'lightly_active' ||
+      'lightlyActive' ||
+      'medium' => ActivityLevel.lightlyActive,
+      'moderately_active' ||
+      'moderatelyActive' ||
+      'hard' => ActivityLevel.moderatelyActive,
+      'very_active' || 'veryActive' => ActivityLevel.veryActive,
+      _ => throw ArgumentError.value(s, 's', 'Unknown activity level'),
+    };
+  }
 }
+
+const currentActivityScaleVersion = 2;
 
 /// How quickly the user wants to lose weight — determines target date & deficit.
 enum WeightLossPace {
@@ -70,6 +84,7 @@ class UserProfile {
     required this.currentWeightKg,
     required this.targetWeightKg,
     required this.activityLevel,
+    required this.activityScaleVersion,
     required this.weightLossPace,
     required this.targetDate,
     required this.bmi,
@@ -94,6 +109,7 @@ class UserProfile {
 
   /// Physical activity level — used to compute TDEE.
   final ActivityLevel activityLevel;
+  final int activityScaleVersion;
 
   /// Desired weight loss pace — used to compute target date and daily deficit.
   final WeightLossPace weightLossPace;
@@ -115,7 +131,8 @@ class UserProfile {
   // ── Serialisation ──────────────────────────────────────────────────────
 
   factory UserProfile.fromFirestore(
-      DocumentSnapshot<Map<String, dynamic>> doc) {
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
     final d = doc.data()!;
     return UserProfile(
       uid: d['uid'] as String,
@@ -127,6 +144,7 @@ class UserProfile {
       currentWeightKg: (d['currentWeightKg'] as num).toDouble(),
       targetWeightKg: (d['targetWeightKg'] as num).toDouble(),
       activityLevel: ActivityLevel.fromString(d['activityLevel'] as String),
+      activityScaleVersion: (d['activityScaleVersion'] as num?)?.round() ?? 1,
       weightLossPace: WeightLossPace.fromString(d['weightLossPace'] as String),
       targetDate: (d['targetDate'] as Timestamp).toDate(),
       bmi: (d['bmi'] as num).toDouble(),
@@ -142,27 +160,28 @@ class UserProfile {
   }
 
   Map<String, dynamic> toFirestore() => {
-        'uid': uid,
-        'email': email,
-        'name': name,
-        'age': age,
-        'gender': gender.value,
-        'heightCm': heightCm,
-        'currentWeightKg': currentWeightKg,
-        'targetWeightKg': targetWeightKg,
-        'activityLevel': activityLevel.value,
-        'weightLossPace': weightLossPace.value,
-        'targetDate': Timestamp.fromDate(targetDate),
-        'bmi': bmi,
-        'bmr': bmr,
-        'tdee': tdee,
-        'dailyCalorieTarget': dailyCalorieTarget,
-        'goalPaceKgPerWeek': goalPaceKgPerWeek,
-        'goalPaceLevel': goalPaceLevel.value,
-        'onboardingCompleted': onboardingCompleted,
-        'createdAt': Timestamp.fromDate(createdAt),
-        'updatedAt': Timestamp.fromDate(updatedAt),
-      };
+    'uid': uid,
+    'email': email,
+    'name': name,
+    'age': age,
+    'gender': gender.value,
+    'heightCm': heightCm,
+    'currentWeightKg': currentWeightKg,
+    'targetWeightKg': targetWeightKg,
+    'activityLevel': activityLevel.value,
+    'activityScaleVersion': activityScaleVersion,
+    'weightLossPace': weightLossPace.value,
+    'targetDate': Timestamp.fromDate(targetDate),
+    'bmi': bmi,
+    'bmr': bmr,
+    'tdee': tdee,
+    'dailyCalorieTarget': dailyCalorieTarget,
+    'goalPaceKgPerWeek': goalPaceKgPerWeek,
+    'goalPaceLevel': goalPaceLevel.value,
+    'onboardingCompleted': onboardingCompleted,
+    'createdAt': Timestamp.fromDate(createdAt),
+    'updatedAt': Timestamp.fromDate(updatedAt),
+  };
 
   // ── copyWith ───────────────────────────────────────────────────────────
 
@@ -176,6 +195,7 @@ class UserProfile {
     double? currentWeightKg,
     double? targetWeightKg,
     ActivityLevel? activityLevel,
+    int? activityScaleVersion,
     WeightLossPace? weightLossPace,
     DateTime? targetDate,
     double? bmi,
@@ -198,6 +218,7 @@ class UserProfile {
       currentWeightKg: currentWeightKg ?? this.currentWeightKg,
       targetWeightKg: targetWeightKg ?? this.targetWeightKg,
       activityLevel: activityLevel ?? this.activityLevel,
+      activityScaleVersion: activityScaleVersion ?? this.activityScaleVersion,
       weightLossPace: weightLossPace ?? this.weightLossPace,
       targetDate: targetDate ?? this.targetDate,
       bmi: bmi ?? this.bmi,

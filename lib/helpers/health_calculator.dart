@@ -15,12 +15,7 @@ class HealthCalculator {
   /// Male:   BMR = 10w + 6.25h - 5a + 5
   /// Female: BMR = 10w + 6.25h - 5a - 161
   /// Other:  average of male and female offsets (-78)
-  static double bmr(
-    double weightKg,
-    double heightCm,
-    int age,
-    Gender gender,
-  ) {
+  static double bmr(double weightKg, double heightCm, int age, Gender gender) {
     final base = 10 * weightKg + 6.25 * heightCm - 5 * age;
     return switch (gender) {
       Gender.male => base + 5,
@@ -32,9 +27,10 @@ class HealthCalculator {
   /// Converts physical activity level to a TDEE multiplier.
   static double activityMultiplier(ActivityLevel level) {
     return switch (level) {
-      ActivityLevel.light => 1.35,
-      ActivityLevel.medium => 1.55,
-      ActivityLevel.hard => 1.75,
+      ActivityLevel.sedentary => 1.20,
+      ActivityLevel.lightlyActive => 1.375,
+      ActivityLevel.moderatelyActive => 1.55,
+      ActivityLevel.veryActive => 1.725,
     };
   }
 
@@ -63,8 +59,10 @@ class HealthCalculator {
     WeightLossPace pace,
   ) {
     final paceKgPerWeek = goalPaceFromWeightLossPace(pace);
-    final totalKgToLose =
-        (currentWeightKg - targetWeightKg).clamp(0, double.infinity);
+    final totalKgToLose = (currentWeightKg - targetWeightKg).clamp(
+      0,
+      double.infinity,
+    );
     final daysNeeded = ((totalKgToLose / paceKgPerWeek) * 7).ceil();
     return DateTime.now().add(Duration(days: daysNeeded));
   }

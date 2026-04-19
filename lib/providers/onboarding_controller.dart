@@ -26,8 +26,12 @@ class OnboardingController extends AsyncNotifier<void> {
       if (uid == null) throw Exception('Not authenticated');
 
       final calcBmi = HealthCalculator.bmi(currentWeightKg, heightCm);
-      final calcBmr =
-          HealthCalculator.bmr(currentWeightKg, heightCm, age, gender);
+      final calcBmr = HealthCalculator.bmr(
+        currentWeightKg,
+        heightCm,
+        age,
+        gender,
+      );
       final calcTdee = HealthCalculator.tdee(calcBmr, activityLevel);
       final isMaintaining = weightLossPace == WeightLossPace.maintain;
       final resolvedTargetWeight = isMaintaining
@@ -63,6 +67,7 @@ class OnboardingController extends AsyncNotifier<void> {
         currentWeightKg: currentWeightKg,
         targetWeightKg: resolvedTargetWeight,
         activityLevel: activityLevel,
+        activityScaleVersion: currentActivityScaleVersion,
         weightLossPace: weightLossPace,
         targetDate: targetDate,
         bmi: calcBmi,
@@ -82,6 +87,4 @@ class OnboardingController extends AsyncNotifier<void> {
 }
 
 final onboardingControllerProvider =
-    AsyncNotifierProvider<OnboardingController, void>(
-  OnboardingController.new,
-);
+    AsyncNotifierProvider<OnboardingController, void>(OnboardingController.new);

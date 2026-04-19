@@ -46,7 +46,10 @@ final currentCheckInAvailabilityProvider =
           );
       final repository = ref.watch(checkInRepositoryProvider);
       final existingCheckIn = await repository.fetchCheckIn(uid, period.key);
-      final promptShownAt = await repository.fetchPromptShownAt(uid, period.key);
+      final promptShownAt = await repository.fetchPromptShownAt(
+        uid,
+        period.key,
+      );
 
       return service.buildAvailability(
         profile: profile,

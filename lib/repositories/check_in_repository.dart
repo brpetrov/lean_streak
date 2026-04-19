@@ -12,7 +12,10 @@ class CheckInRepository {
   }
 
   CollectionReference<Map<String, dynamic>> _promptStatus(String uid) {
-    return _db.collection('users').doc(uid).collection('check_in_prompt_status');
+    return _db
+        .collection('users')
+        .doc(uid)
+        .collection('check_in_prompt_status');
   }
 
   Future<void> saveCheckIn(String uid, CheckIn checkIn) async {
@@ -32,13 +35,10 @@ class CheckInRepository {
   }) async {
     final snapshot = await _checkIns(uid).orderBy('periodStart').get();
 
-    return snapshot.docs
-        .map(CheckIn.fromFirestore)
-        .where((checkIn) {
-          return !checkIn.periodStart.isBefore(startDate) &&
-              !checkIn.periodEnd.isAfter(endDate);
-        })
-        .toList();
+    return snapshot.docs.map(CheckIn.fromFirestore).where((checkIn) {
+      return !checkIn.periodStart.isBefore(startDate) &&
+          !checkIn.periodEnd.isAfter(endDate);
+    }).toList();
   }
 
   Stream<CheckIn?> watchCheckIn(String uid, String periodKey) {

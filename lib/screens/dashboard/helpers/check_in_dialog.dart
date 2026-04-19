@@ -28,14 +28,14 @@ Future<void> showCheckInUnavailableDialog(
     context: context,
     builder: (context) {
       return AlertDialog(
-        title: const Text('Check-in not due yet'),
+        title: Text('Check-in not due yet'),
         content: Text(
           'Your next 2-week check-in will be available on ${DateFormat('d MMM yyyy').format(nextAvailableDate)}.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
+            child: Text('Close'),
           ),
         ],
       );
@@ -104,11 +104,11 @@ class _CheckInDialogState extends ConsumerState<_CheckInDialog> {
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('2-week check-in'),
-          const SizedBox(height: 6),
+          Text('2-week check-in'),
+          SizedBox(height: 6),
           Text(
             '${DateFormat('d MMM').format(period.startDate)} to ${DateFormat('d MMM yyyy').format(period.endDate)}',
-            style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -124,7 +124,7 @@ class _CheckInDialogState extends ConsumerState<_CheckInDialog> {
                 loggedDays: review?.loggedDays ?? 0,
                 greenDays: review?.greenDays ?? 0,
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               _QuestionSection<CheckInWeightTrend>(
                 title: 'How has your weight changed recently?',
                 value: _weightTrend,
@@ -132,7 +132,7 @@ class _CheckInDialogState extends ConsumerState<_CheckInDialog> {
                 labelBuilder: (value) => value.label,
                 onChanged: (value) => setState(() => _weightTrend = value),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               _QuestionSection<CheckInDifficulty>(
                 title: 'How difficult does your calorie target feel?',
                 value: _targetDifficulty,
@@ -140,7 +140,7 @@ class _CheckInDialogState extends ConsumerState<_CheckInDialog> {
                 labelBuilder: (value) => value.label,
                 onChanged: (value) => setState(() => _targetDifficulty = value),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               _QuestionSection<CheckInHunger>(
                 title: 'How has your hunger been?',
                 value: _hunger,
@@ -148,7 +148,7 @@ class _CheckInDialogState extends ConsumerState<_CheckInDialog> {
                 labelBuilder: (value) => value.label,
                 onChanged: (value) => setState(() => _hunger = value),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               _QuestionSection<CheckInPlanFit>(
                 title: 'Do you think your current plan still fits you?',
                 value: _planFit,
@@ -156,20 +156,20 @@ class _CheckInDialogState extends ConsumerState<_CheckInDialog> {
                 labelBuilder: (value) => value.label,
                 onChanged: (value) => setState(() => _planFit = value),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               TextField(
                 controller: _weightCtrl,
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Current weight (optional)',
                   suffixText: 'kg',
                   helperText:
-                      'If you want to update this, we will save the check-in and let you review your profile next.',
+                      'If you want to update this, we will save the check-in and let you review your health settings next.',
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               _RecommendationCard(recommendation: recommendation),
             ],
           ),
@@ -180,26 +180,26 @@ class _CheckInDialogState extends ConsumerState<_CheckInDialog> {
           onPressed: controllerState.isLoading
               ? null
               : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text('Cancel'),
         ),
         if (shouldOfferProfileAction)
           OutlinedButton(
             onPressed: controllerState.isLoading
                 ? null
                 : () => _save(CheckInDialogResult.savedAndOpenProfile),
-            child: const Text('Save and open profile'),
+            child: Text('Save and open health settings'),
           ),
         FilledButton(
           onPressed: controllerState.isLoading
               ? null
               : () => _save(CheckInDialogResult.saved),
           child: controllerState.isLoading
-              ? const SizedBox(
+              ? SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Save check-in'),
+              : Text('Save check-in'),
         ),
       ],
     );
@@ -259,10 +259,7 @@ class _CheckInContextCard extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: _ContextMetric(
-              label: 'On track days',
-              value: '$greenDays',
-            ),
+            child: _ContextMetric(label: 'On track days', value: '$greenDays'),
           ),
         ],
       ),
@@ -285,12 +282,12 @@ class _ContextMetric extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
@@ -324,13 +321,13 @@ class _QuestionSection<T> extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
             color: AppColors.textPrimary,
           ),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -365,7 +362,7 @@ class _RecommendationCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Recommendation',
             style: TextStyle(
               fontSize: 12,
@@ -373,19 +370,19 @@ class _RecommendationCard extends StatelessWidget {
               color: AppColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(
             recommendation.title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(
             recommendation.reason,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               color: AppColors.textSecondary,
               height: 1.35,

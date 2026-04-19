@@ -61,12 +61,9 @@ class _PasswordConfirmDialogState extends State<_PasswordConfirmDialog> {
         children: [
           Text(
             widget.description,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              height: 1.4,
-            ),
+            style: TextStyle(color: AppColors.textSecondary, height: 1.4),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           TextField(
             controller: _passwordCtrl,
             autofocus: true,
@@ -74,7 +71,7 @@ class _PasswordConfirmDialogState extends State<_PasswordConfirmDialog> {
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               labelText: 'Password',
-              prefixIcon: const Icon(Icons.lock_outline_rounded),
+              prefixIcon: Icon(Icons.lock_outline_rounded),
               suffixIcon: IconButton(
                 onPressed: () => setState(() => _obscure = !_obscure),
                 icon: Icon(
@@ -90,7 +87,7 @@ class _PasswordConfirmDialogState extends State<_PasswordConfirmDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text('Cancel'),
         ),
         FilledButton(
           onPressed: canConfirm

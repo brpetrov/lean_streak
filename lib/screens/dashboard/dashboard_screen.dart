@@ -10,8 +10,6 @@ import 'package:lean_streak/core/constants/app_colors.dart';
 import 'package:lean_streak/models/daily_summary.dart';
 import 'package:lean_streak/models/meal.dart';
 import 'package:lean_streak/models/user_profile.dart';
-import 'package:lean_streak/providers/account_controller.dart';
-import 'package:lean_streak/providers/auth_controller.dart';
 import 'package:lean_streak/providers/check_in_controller.dart';
 import 'package:lean_streak/providers/check_in_state_provider.dart';
 import 'package:lean_streak/providers/daily_summary_provider.dart';
@@ -22,7 +20,8 @@ import 'package:lean_streak/providers/user_profile_provider.dart';
 import 'package:lean_streak/screens/dashboard/helpers/check_in_dialog.dart';
 import 'package:lean_streak/screens/meals/log_meal_sheet.dart';
 import 'package:lean_streak/services/check_in_service.dart';
-import 'package:lean_streak/widgets/password_confirm_dialog.dart';
+import 'package:lean_streak/widgets/app_frame.dart';
+import 'package:lean_streak/widgets/responsive_page.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -89,12 +88,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authControllerProvider);
-    final accountActionState = ref.watch(accountControllerProvider);
     final profileAsync = ref.watch(userProfileProvider);
-    final checkInAvailabilityAsync = ref.watch(
-      currentCheckInAvailabilityProvider,
-    );
     final today = _activeDate;
     final dateKey = DateFormat('yyyy-MM-dd').format(today);
 
@@ -125,7 +119,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('A 2-week check-in is ready.'),
+              content: Text('A 2-week check-in is ready.'),
               action: SnackBarAction(
                 label: 'Open',
                 onPressed: () => _openCheckInFlow(context, availability),
@@ -136,87 +130,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       },
     );
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('LeanStreak'),
-        actions: [
-          PopupMenuButton<_DashboardMenuAction>(
-            tooltip: 'More options',
-            onSelected: (action) async {
-              switch (action) {
-                case _DashboardMenuAction.checkIn:
-                  await _openCheckInFlow(
-                    context,
-                    checkInAvailabilityAsync.valueOrNull,
-                  );
-                case _DashboardMenuAction.profile:
-                  context.push(AppRoutes.profile);
-                case _DashboardMenuAction.review:
-                  context.push(AppRoutes.review);
-                case _DashboardMenuAction.summary:
-                  context.push(AppRoutes.summary);
-                case _DashboardMenuAction.resetProgress:
-                  await _confirmAndResetProgress(context);
-                case _DashboardMenuAction.signOut:
-                  if (authState.isLoading || accountActionState.isLoading) {
-                    return;
-                  }
-                  await ref.read(authControllerProvider.notifier).signOut();
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: _DashboardMenuAction.checkIn,
-                child: Text('Check-in'),
-              ),
-              const PopupMenuItem(
-                value: _DashboardMenuAction.profile,
-                child: Text('Edit Profile'),
-              ),
-              const PopupMenuItem(
-                value: _DashboardMenuAction.review,
-                child: Text('Review'),
-              ),
-              const PopupMenuItem(
-                value: _DashboardMenuAction.summary,
-                child: Text('Summary'),
-              ),
-              PopupMenuItem(
-                value: _DashboardMenuAction.resetProgress,
-                enabled: !accountActionState.isLoading,
-                child: accountActionState.isLoading
-                    ? const Text('Working...')
-                    : const Text('Reset Progress'),
-              ),
-              PopupMenuItem(
-                value: _DashboardMenuAction.signOut,
-                enabled: !authState.isLoading && !accountActionState.isLoading,
-                child: authState.isLoading
-                    ? const Text('Signing out...')
-                    : const Text('Log out'),
-              ),
-            ],
-            icon: authState.isLoading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.more_vert_rounded),
-          ),
-        ],
-      ),
+    return AppFrame(
+      title: 'Today',
+      currentTab: AppFrameTab.today,
       floatingActionButton: FloatingActionButton(
         onPressed: () => showLogMealSheet(context),
         backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        child: const Icon(Icons.add_rounded),
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        child: Icon(Icons.add_rounded),
       ),
       body: profileAsync.when(
         data: (profile) {
           if (profile == null) {
-            return const Center(
+            return Center(
               child: Text(
                 'Could not load your profile right now.',
                 style: TextStyle(color: AppColors.textSecondary),
@@ -246,7 +172,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                 profile: profile,
                 meals: meals,
                 summary: summary,
-                onOpenReview: () => context.push(AppRoutes.review),
+                onOpenReview: () => context.go(AppRoutes.review),
                 onEditMeal: (meal) =>
                     showLogMealSheet(context, existingMeal: meal),
                 onDeleteMeal: (meal) async {
@@ -254,19 +180,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                     context: context,
                     builder: (context) {
                       return AlertDialog(
-                        title: const Text('Delete meal?'),
-                        content: const Text('Remove this meal from today?'),
+                        title: Text('Delete meal?'),
+                        content: Text('Remove this meal from today?'),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.of(context).pop(false),
-                            child: const Text('Cancel'),
+                            child: Text('Cancel'),
                           ),
                           FilledButton(
                             onPressed: () => Navigator.of(context).pop(true),
                             style: FilledButton.styleFrom(
                               backgroundColor: AppColors.error,
                             ),
-                            child: const Text('Delete'),
+                            child: Text('Delete'),
                           ),
                         ],
                       );
@@ -282,7 +208,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                   } catch (_) {
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
+                      SnackBar(
                         content: Text('Could not delete meal right now.'),
                       ),
                     );
@@ -290,10 +216,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                 },
               );
             },
-            loading: () => const Center(
+            loading: () => Center(
               child: CircularProgressIndicator(color: AppColors.primary),
             ),
-            error: (_, _) => const Center(
+            error: (_, _) => Center(
               child: Text(
                 'Could not load meals right now.',
                 style: TextStyle(color: AppColors.textSecondary),
@@ -301,10 +227,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             ),
           );
         },
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
-        error: (_, _) => const Center(
+        loading: () =>
+            Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        error: (_, _) => Center(
           child: Text(
             'Could not load your profile right now.',
             style: TextStyle(color: AppColors.textSecondary),
@@ -319,9 +244,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     CheckInAvailability? availability,
   ) async {
     if (availability == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Check-in is not ready yet.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Check-in is not ready yet.')));
       return;
     }
 
@@ -338,41 +263,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
 
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Check-in saved.')));
+    ).showSnackBar(SnackBar(content: Text('Check-in saved.')));
 
     if (result == CheckInDialogResult.savedAndOpenProfile) {
-      context.push(AppRoutes.profile);
-    }
-  }
-
-  Future<void> _confirmAndResetProgress(BuildContext context) async {
-    final password = await showPasswordConfirmDialog(
-      context,
-      title: 'Reset progress?',
-      description:
-          'This deletes your meals, daily summaries, check-ins, and AI usage. Your profile and login stay.',
-      confirmLabel: 'Reset',
-      destructive: true,
-    );
-
-    if (password == null || !context.mounted) return;
-
-    try {
-      await ref
-          .read(accountControllerProvider.notifier)
-          .resetProgress(password: password);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Progress reset.')));
-    } catch (error) {
-      if (!context.mounted) return;
-      final message = error is AccountActionException
-          ? error.message
-          : 'Could not reset progress right now.';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      context.push(AppRoutes.healthSettings);
     }
   }
 }
@@ -401,43 +295,52 @@ class _DashboardContent extends ConsumerWidget {
     final bottomPadding = MediaQuery.of(context).padding.bottom + 32;
 
     return ListView(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomPadding),
+      padding: EdgeInsets.zero,
       children: [
-        _HeaderSection(date: date, name: profile.name),
-        const SizedBox(height: 20),
-        _MonthPreviewCard(date: date, onOpenReview: onOpenReview),
-        const SizedBox(height: 16),
-        _CalorieOverviewCard(summary: summary),
-        const SizedBox(height: 16),
-        _StatusCard(summary: summary),
-        const SizedBox(height: 24),
-        Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'Today\'s Meals',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
+        ResponsivePage(
+          maxWidth: 760,
+          padding: EdgeInsets.fromLTRB(20, 20, 20, bottomPadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _HeaderSection(date: date, name: profile.name),
+              SizedBox(height: 20),
+              _MonthPreviewCard(date: date, onOpenReview: onOpenReview),
+              SizedBox(height: 16),
+              _CalorieOverviewCard(summary: summary),
+              SizedBox(height: 16),
+              _StatusCard(summary: summary),
+              SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Today\'s Meals',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '${meals.length} logged',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
-            ),
-            Text(
-              '${meals.length} logged',
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
+              SizedBox(height: 12),
+              if (meals.isEmpty)
+                const _EmptyMealsState()
+              else
+                ..._buildMealCards(meals),
+            ],
+          ),
         ),
-        const SizedBox(height: 12),
-        if (meals.isEmpty)
-          const _EmptyMealsState()
-        else
-          ..._buildMealCards(meals),
       ],
     );
   }
@@ -453,7 +356,7 @@ class _DashboardContent extends ConsumerWidget {
         ),
       );
       if (index < meals.length - 1) {
-        widgets.add(const SizedBox(height: 12));
+        widgets.add(SizedBox(height: 12));
       }
     }
     return widgets;
@@ -475,16 +378,16 @@ class _HeaderSection extends StatelessWidget {
       children: [
         Text(
           DateFormat('EEEE, d MMMM').format(date),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             color: AppColors.textSecondary,
             fontWeight: FontWeight.w500,
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: 8),
         Text(
           'Hi, $firstName',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 30,
             fontWeight: FontWeight.w800,
             color: AppColors.textPrimary,
@@ -513,7 +416,7 @@ class _CalorieOverviewCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
             color: AppColors.shadow,
             blurRadius: 18,
@@ -524,7 +427,7 @@ class _CalorieOverviewCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Calories Today',
             style: TextStyle(
               fontSize: 18,
@@ -532,15 +435,12 @@ class _CalorieOverviewCard extends StatelessWidget {
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
             '${summary.totalCalories} logged against ${summary.targetCalories} kcal target',
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
           ),
-          const SizedBox(height: 18),
+          SizedBox(height: 18),
           Row(
             children: [
               Expanded(
@@ -585,132 +485,147 @@ class _MonthPreviewCard extends ConsumerWidget {
     final range = ReviewRange(startDate: startOfMonth, endDate: today);
     final summariesAsync = ref.watch(reviewSummariesProvider(range));
 
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: onOpenReview,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 18,
-            offset: Offset(0, 8),
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.shadow,
+                blurRadius: 18,
+                offset: Offset(0, 8),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: summariesAsync.when(
-        data: (summariesByDate) {
-          final days = List.generate(
-            today.day,
-            (index) => DateTime(date.year, date.month, index + 1),
-          );
-          final summaries = days
-              .map(
-                (day) => summariesByDate[DateFormat('yyyy-MM-dd').format(day)],
-              )
-              .whereType<DailySummary>()
-              .toList();
-          final greenDays = summaries
-              .where((summary) => summary.status == DailyStatus.green)
-              .length;
-          final yellowDays = summaries
-              .where((summary) => summary.status == DailyStatus.yellow)
-              .length;
-          final redDays = summaries
-              .where((summary) => summary.status == DailyStatus.red)
-              .length;
+          child: summariesAsync.when(
+            data: (summariesByDate) {
+              final days = List.generate(
+                today.day,
+                (index) => DateTime(date.year, date.month, index + 1),
+              );
+              final summaries = days
+                  .map(
+                    (day) =>
+                        summariesByDate[DateFormat('yyyy-MM-dd').format(day)],
+                  )
+                  .whereType<DailySummary>()
+                  .toList();
+              final greenDays = summaries
+                  .where((summary) => summary.status == DailyStatus.green)
+                  .length;
+              final yellowDays = summaries
+                  .where((summary) => summary.status == DailyStatus.yellow)
+                  .length;
+              final redDays = summaries
+                  .where((summary) => summary.status == DailyStatus.red)
+                  .length;
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Month Preview',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Month Preview',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              '${DateFormat('MMMM').format(date)} so far',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${DateFormat('MMMM').format(date)} so far',
-                          style: const TextStyle(
+                      ),
+                      TextButton(onPressed: onOpenReview, child: Text('Open')),
+                    ],
+                  ),
+                  SizedBox(height: 16),
+                  SizedBox(
+                    height: 96,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: days.map((day) {
+                        final summary =
+                            summariesByDate[DateFormat(
+                              'yyyy-MM-dd',
+                            ).format(day)];
+                        return Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 1.5,
+                            ),
+                            child: _MonthPreviewBar(day: day, summary: summary),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          summaries.isEmpty
+                              ? 'No logged days yet this month.'
+                              : '${summaries.length} logged days this month.',
+                          style: TextStyle(
                             fontSize: 14,
                             color: AppColors.textSecondary,
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: onOpenReview,
-                    child: const Text('Open'),
+                      ),
+                      SizedBox(width: 12),
+                      _MiniStatusChip(
+                        label: '$greenDays',
+                        color: AppColors.veryGood,
+                      ),
+                      SizedBox(width: 6),
+                      _MiniStatusChip(
+                        label: '$yellowDays',
+                        color: AppColors.bad,
+                      ),
+                      SizedBox(width: 6),
+                      _MiniStatusChip(
+                        label: '$redDays',
+                        color: AppColors.veryBad,
+                      ),
+                    ],
                   ),
                 ],
+              );
+            },
+            loading: () => SizedBox(
+              height: 148,
+              child: Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
               ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 96,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: days.map((day) {
-                    final summary =
-                        summariesByDate[DateFormat('yyyy-MM-dd').format(day)];
-                    return Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 1.5),
-                        child: _MonthPreviewBar(summary: summary),
-                      ),
-                    );
-                  }).toList(),
+            ),
+            error: (_, _) => SizedBox(
+              height: 148,
+              child: Center(
+                child: Text(
+                  'Could not load month preview.',
+                  style: TextStyle(color: AppColors.textSecondary),
                 ),
               ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      summaries.isEmpty
-                          ? 'No logged days yet this month.'
-                          : '${summaries.length} logged days this month.',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  _MiniStatusChip(
-                    label: '$greenDays',
-                    color: AppColors.veryGood,
-                  ),
-                  const SizedBox(width: 6),
-                  _MiniStatusChip(label: '$yellowDays', color: AppColors.bad),
-                  const SizedBox(width: 6),
-                  _MiniStatusChip(label: '$redDays', color: AppColors.veryBad),
-                ],
-              ),
-            ],
-          );
-        },
-        loading: () => const SizedBox(
-          height: 148,
-          child: Center(
-            child: CircularProgressIndicator(color: AppColors.primary),
-          ),
-        ),
-        error: (_, _) => const SizedBox(
-          height: 148,
-          child: Center(
-            child: Text(
-              'Could not load month preview.',
-              style: TextStyle(color: AppColors.textSecondary),
             ),
           ),
         ),
@@ -720,8 +635,9 @@ class _MonthPreviewCard extends ConsumerWidget {
 }
 
 class _MonthPreviewBar extends StatelessWidget {
-  const _MonthPreviewBar({required this.summary});
+  const _MonthPreviewBar({required this.day, required this.summary});
 
+  final DateTime day;
   final DailySummary? summary;
 
   @override
@@ -735,15 +651,22 @@ class _MonthPreviewBar extends StatelessWidget {
                       .clamp(0.15, 1.25) /
                   1.25)
               .toDouble();
+    final tooltipMessage = summary == null
+        ? '${DateFormat('d MMM').format(day)}: no calories logged'
+        : '${DateFormat('d MMM').format(day)}: ${summary!.totalCalories} kcal';
 
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: FractionallySizedBox(
-        heightFactor: heightFactor,
-        child: Container(
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(999),
+    return Tooltip(
+      message: tooltipMessage,
+      waitDuration: const Duration(milliseconds: 250),
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: FractionallySizedBox(
+          heightFactor: heightFactor,
+          child: Container(
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(999),
+            ),
           ),
         ),
       ),
@@ -791,7 +714,7 @@ class _StatusCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
             color: AppColors.shadow,
             blurRadius: 18,
@@ -804,7 +727,7 @@ class _StatusCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Today\'s Status',
                   style: TextStyle(
@@ -830,10 +753,10 @@ class _StatusCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           Text(
             _statusMessage(summary),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               color: AppColors.textSecondary,
               height: 1.4,
@@ -865,12 +788,9 @@ class _MetricBlock extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(
             value,
             style: TextStyle(
@@ -897,7 +817,7 @@ class _EmptyMealsState extends StatelessWidget {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(18),
       ),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
@@ -959,16 +879,16 @@ class _MealCard extends StatelessWidget {
                   children: [
                     Text(
                       mealName,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Text(
                       time,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         color: AppColors.textSecondary,
                       ),
@@ -978,7 +898,7 @@ class _MealCard extends StatelessWidget {
               ),
               Text(
                 '${meal.calories.round()} kcal',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: AppColors.primary,
@@ -992,7 +912,7 @@ class _MealCard extends StatelessWidget {
                   }
                   onDelete();
                 },
-                itemBuilder: (context) => const [
+                itemBuilder: (context) => [
                   PopupMenuItem(value: _MealAction.edit, child: Text('Edit')),
                   PopupMenuItem(
                     value: _MealAction.delete,
@@ -1003,7 +923,7 @@ class _MealCard extends StatelessWidget {
             ],
           ),
           if (meal.tags.isNotEmpty) ...[
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -1041,13 +961,10 @@ class _MealCard extends StatelessWidget {
             ),
           ],
           if (meal.note != null) ...[
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             Text(
               meal.note!,
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
+              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
             ),
           ],
         ],
@@ -1057,15 +974,6 @@ class _MealCard extends StatelessWidget {
 }
 
 enum _MealAction { edit, delete }
-
-enum _DashboardMenuAction {
-  checkIn,
-  profile,
-  review,
-  summary,
-  resetProgress,
-  signOut,
-}
 
 Color _statusColor(DailyStatus status) {
   return switch (status) {

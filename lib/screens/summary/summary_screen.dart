@@ -8,6 +8,7 @@ import 'package:lean_streak/models/daily_summary.dart';
 import 'package:lean_streak/models/period_review.dart';
 import 'package:lean_streak/providers/period_review_provider.dart';
 import 'package:lean_streak/providers/review_provider.dart';
+import 'package:lean_streak/widgets/app_frame.dart';
 
 class SummaryScreen extends ConsumerStatefulWidget {
   const SummaryScreen({super.key});
@@ -24,9 +25,9 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
   Widget build(BuildContext context) {
     final periodsAsync = ref.watch(reviewPeriodsProvider);
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Summary')),
+    return AppFrame(
+      title: 'Summary',
+      currentTab: AppFrameTab.summary,
       body: periodsAsync.when(
         data: (periods) {
           final completedPeriods = _mode == _SummaryMode.week
@@ -49,7 +50,11 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                 )
               : PeriodReviewRange(
                   startDate: focusedStart,
-                  endDate: DateTime(focusedStart.year, focusedStart.month + 1, 0),
+                  endDate: DateTime(
+                    focusedStart.year,
+                    focusedStart.month + 1,
+                    0,
+                  ),
                 );
           final reviewAsync = ref.watch(periodReviewProvider(range));
 
@@ -71,7 +76,7 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
               ),
               children: [
                 const _SummaryHeader(),
-                const SizedBox(height: 20),
+                SizedBox(height: 20),
                 _SummaryModeSelector(
                   mode: _mode,
                   onModeChanged: (mode) {
@@ -81,19 +86,21 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                     });
                   },
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 _SummaryPeriodBar(
                   label: _periodLabel(focusedStart, _mode),
                   canGoBack: currentIndex > 0,
                   canGoForward: currentIndex < completedPeriods.length - 1,
                   onPrevious: currentIndex > 0
                       ? () => setState(() {
-                          _selectedPeriodStart = completedPeriods[currentIndex - 1];
+                          _selectedPeriodStart =
+                              completedPeriods[currentIndex - 1];
                         })
                       : null,
                   onNext: currentIndex < completedPeriods.length - 1
                       ? () => setState(() {
-                          _selectedPeriodStart = completedPeriods[currentIndex + 1];
+                          _selectedPeriodStart =
+                              completedPeriods[currentIndex + 1];
                         })
                       : null,
                   onLatest: currentIndex == completedPeriods.length - 1
@@ -102,14 +109,16 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
                           _selectedPeriodStart = completedPeriods.last;
                         }),
                 ),
-                const SizedBox(height: 20),
+                SizedBox(height: 20),
                 reviewAsync.when(
                   data: (review) =>
                       _PeriodSummaryContent(review: review, mode: _mode),
-                  loading: () => const Padding(
+                  loading: () => Padding(
                     padding: EdgeInsets.only(top: 80),
                     child: Center(
-                      child: CircularProgressIndicator(color: AppColors.primary),
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                      ),
                     ),
                   ),
                   error: (_, _) => const _SummaryErrorState(),
@@ -118,9 +127,8 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
             ),
           );
         },
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
+        loading: () =>
+            Center(child: CircularProgressIndicator(color: AppColors.primary)),
         error: (_, _) => const _SummaryErrorState(),
       ),
     );
@@ -132,7 +140,7 @@ class _SummaryHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
@@ -167,7 +175,7 @@ class _SummaryModeSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     return SegmentedButton<_SummaryMode>(
       showSelectedIcon: false,
-      segments: const [
+      segments: [
         ButtonSegment(value: _SummaryMode.week, label: Text('Week')),
         ButtonSegment(value: _SummaryMode.month, label: Text('Month')),
       ],
@@ -206,13 +214,13 @@ class _SummaryPeriodBar extends StatelessWidget {
         children: [
           IconButton(
             onPressed: canGoBack ? onPrevious : null,
-            icon: const Icon(Icons.chevron_left_rounded),
+            icon: Icon(Icons.chevron_left_rounded),
           ),
           Expanded(
             child: Text(
               label,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
@@ -222,7 +230,7 @@ class _SummaryPeriodBar extends StatelessWidget {
           OutlinedButton(
             onPressed: onLatest,
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: AppColors.divider),
+              side: BorderSide(color: AppColors.divider),
               minimumSize: const Size(0, 40),
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -231,11 +239,11 @@ class _SummaryPeriodBar extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text('Latest'),
+            child: Text('Latest'),
           ),
           IconButton(
             onPressed: canGoForward ? onNext : null,
-            icon: const Icon(Icons.chevron_right_rounded),
+            icon: Icon(Icons.chevron_right_rounded),
           ),
         ],
       ),
@@ -255,17 +263,17 @@ class _PeriodSummaryContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _HeroSummaryCard(review: review, mode: mode),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         _MetricGrid(review: review),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         if (mode == _SummaryMode.month) ...[
           _MonthlySnapshotCard(review: review),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
         ],
         _StatusCountsCard(review: review),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         _DayHighlightsCard(review: review),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         _TagsCard(
           title: 'Top healthy tags',
           tags: review.topHelpfulTags,
@@ -273,7 +281,7 @@ class _PeriodSummaryContent extends StatelessWidget {
           chipColor: AppColors.tagPositive,
           chipBackground: AppColors.tagPositiveBg,
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         _TagsCard(
           title: 'Top unhealthy tags',
           tags: review.topRiskyTags,
@@ -281,12 +289,12 @@ class _PeriodSummaryContent extends StatelessWidget {
           chipColor: AppColors.tagWarning,
           chipBackground: AppColors.tagWarningBg,
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         _GuidanceCard(guidance: review.guidance),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         if (mode == _SummaryMode.month) ...[
           _MonthlyCheckInCard(checkIns: review.checkIns),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
         ],
         _LoggedDaysCard(review: review),
       ],
@@ -310,7 +318,7 @@ class _HeroSummaryCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
             color: AppColors.shadow,
             blurRadius: 18,
@@ -326,7 +334,7 @@ class _HeroSummaryCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   '${review.loggedDays} of ${review.daysInPeriod} days logged',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     color: AppColors.textSecondary,
                     fontWeight: FontWeight.w600,
@@ -349,24 +357,21 @@ class _HeroSummaryCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           Text(
             '$consistencyPercent%',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 42,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
             mode == _SummaryMode.month
                 ? 'On-track day rate for this completed month'
                 : 'On-track day rate for this completed week',
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -417,15 +422,12 @@ class _MetricTile extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,
@@ -455,7 +457,7 @@ class _MonthlySnapshotCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Monthly snapshot',
             style: TextStyle(
               fontSize: 18,
@@ -463,16 +465,16 @@ class _MonthlySnapshotCard extends StatelessWidget {
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(
             '${review.greenDays} days were on track out of ${review.loggedDays} logged days.',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               color: AppColors.textSecondary,
               height: 1.4,
             ),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           Row(
             children: [
               Expanded(
@@ -481,7 +483,7 @@ class _MonthlySnapshotCard extends StatelessWidget {
                   value: '${review.greenDays}',
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: _MetricTile(
                   label: 'Consistency',
@@ -512,7 +514,7 @@ class _StatusCountsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Day status counts',
             style: TextStyle(
               fontSize: 18,
@@ -520,7 +522,7 @@ class _StatusCountsCard extends StatelessWidget {
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           Wrap(
             spacing: 10,
             runSpacing: 10,
@@ -591,7 +593,7 @@ class _DayHighlightsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Closest and furthest from target',
             style: TextStyle(
               fontSize: 18,
@@ -599,9 +601,9 @@ class _DayHighlightsCard extends StatelessWidget {
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           if (review.bestDay == null && review.worstDay == null)
-            const Text(
+            Text(
               'No saved days in this period.',
               style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
             )
@@ -615,7 +617,7 @@ class _DayHighlightsCard extends StatelessWidget {
                     accentColor: AppColors.veryGood,
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Expanded(
                   child: _DayHighlightTile(
                     title: 'Furthest day',
@@ -653,10 +655,7 @@ class _DayHighlightTile extends StatelessWidget {
         ),
         child: Text(
           '$title unavailable',
-          style: const TextStyle(
-            fontSize: 14,
-            color: AppColors.textSecondary,
-          ),
+          style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
         ),
       );
     }
@@ -685,24 +684,21 @@ class _DayHighlightTile extends StatelessWidget {
                   color: accentColor,
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Text(
                 DateFormat('EEE, d MMM').format(date),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
                 ),
               ),
-              const SizedBox(height: 6),
+              SizedBox(height: 6),
               Text(
                 '${summary!.totalCalories}/${summary!.targetCalories} kcal',
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                ),
+                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: 4),
               Text(
                 'Delta ${_deltaLabel(summary!.calorieDelta)}',
                 style: TextStyle(
@@ -747,20 +743,17 @@ class _TagsCard extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           if (tags.isEmpty)
             Text(
               emptyLabel,
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
+              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
             )
           else
             Wrap(
@@ -808,7 +801,7 @@ class _GuidanceCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Guidance',
             style: TextStyle(
               fontSize: 18,
@@ -816,14 +809,14 @@ class _GuidanceCard extends StatelessWidget {
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           ...guidance.map((item) {
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(top: 7),
                     child: Icon(
                       Icons.circle,
@@ -831,11 +824,11 @@ class _GuidanceCard extends StatelessWidget {
                       color: AppColors.textSecondary,
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       item,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         color: AppColors.textPrimary,
                         height: 1.4,
@@ -868,7 +861,7 @@ class _MonthlyCheckInCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Check-ins',
             style: TextStyle(
               fontSize: 18,
@@ -876,9 +869,9 @@ class _MonthlyCheckInCard extends StatelessWidget {
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           if (checkIns.isEmpty)
-            const Text(
+            Text(
               'No check-ins were saved in this month.',
               style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
             )
@@ -897,22 +890,22 @@ class _MonthlyCheckInCard extends StatelessWidget {
                     children: [
                       Text(
                         DateFormat('d MMM').format(checkIn.periodEnd),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
                           color: AppColors.textSecondary,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      SizedBox(height: 6),
                       Text(
                         checkIn.recommendation.label,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
                           color: AppColors.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
@@ -926,16 +919,14 @@ class _MonthlyCheckInCard extends StatelessWidget {
                           _CheckInChip(
                             label: 'Hunger: ${checkIn.hunger.label}',
                           ),
-                          _CheckInChip(
-                            label: 'Fit: ${checkIn.planFit.label}',
-                          ),
+                          _CheckInChip(label: 'Fit: ${checkIn.planFit.label}'),
                         ],
                       ),
                       if (checkIn.recommendationReason case final reason?) ...[
-                        const SizedBox(height: 10),
+                        SizedBox(height: 10),
                         Text(
                           reason,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             color: AppColors.textSecondary,
                             height: 1.4,
@@ -969,7 +960,7 @@ class _CheckInChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
           color: AppColors.textSecondary,
@@ -995,7 +986,7 @@ class _LoggedDaysCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Logged days',
             style: TextStyle(
               fontSize: 18,
@@ -1003,9 +994,9 @@ class _LoggedDaysCard extends StatelessWidget {
               color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           if (review.summaries.isEmpty)
-            const Text(
+            Text(
               'No daily summaries were saved for this period.',
               style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
             )
@@ -1034,16 +1025,16 @@ class _LoggedDaysCard extends StatelessWidget {
                               children: [
                                 Text(
                                   DateFormat('EEE, d MMM').format(date),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w700,
                                     color: AppColors.textPrimary,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
+                                SizedBox(height: 4),
                                 Text(
                                   '${summary.totalCalories}/${summary.targetCalories} kcal',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 13,
                                     color: AppColors.textSecondary,
                                   ),
@@ -1097,7 +1088,7 @@ class _SummaryEmptyState extends StatelessWidget {
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(20),
           ),
-          child: const Column(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
@@ -1138,7 +1129,7 @@ class _SummaryErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Padding(
         padding: EdgeInsets.all(24),
         child: Text(
@@ -1173,13 +1164,13 @@ void _showSummaryDaySheet(BuildContext context, DailySummary summary) {
                   date == null
                       ? summary.date
                       : DateFormat('EEEE, d MMMM yyyy').format(date),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -1197,7 +1188,7 @@ void _showSummaryDaySheet(BuildContext context, DailySummary summary) {
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                SizedBox(height: 20),
                 Wrap(
                   spacing: 12,
                   runSpacing: 12,
@@ -1221,18 +1212,18 @@ void _showSummaryDaySheet(BuildContext context, DailySummary summary) {
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
                 Text(
                   _statusDescription(summary),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     color: AppColors.textSecondary,
                     height: 1.5,
                   ),
                 ),
                 if (summary.tagCounts.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  const Text(
+                  SizedBox(height: 24),
+                  Text(
                     'Tag totals',
                     style: TextStyle(
                       fontSize: 18,
@@ -1240,7 +1231,7 @@ void _showSummaryDaySheet(BuildContext context, DailySummary summary) {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -1256,7 +1247,7 @@ void _showSummaryDaySheet(BuildContext context, DailySummary summary) {
                         ),
                         child: Text(
                           '${_formatTagLabel(entry.key)} (${entry.value})',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: AppColors.textSecondary,
@@ -1300,12 +1291,9 @@ class _SummaryDetailMetricCard extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppColors.textSecondary,
-            ),
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(
             value,
             style: TextStyle(
@@ -1328,7 +1316,11 @@ List<DateTime> _completedWeekStarts(List<DateTime> weekStarts) {
 }
 
 List<DateTime> _completedMonthStarts(List<DateTime> monthStarts) {
-  final currentMonthStart = DateTime(DateTime.now().year, DateTime.now().month, 1);
+  final currentMonthStart = DateTime(
+    DateTime.now().year,
+    DateTime.now().month,
+    1,
+  );
   return monthStarts.where((date) => date.isBefore(currentMonthStart)).toList();
 }
 

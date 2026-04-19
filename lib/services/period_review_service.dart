@@ -94,27 +94,28 @@ class PeriodReviewService {
     Map<String, int> tagCounts, {
     required bool positive,
   }) {
-    final tags = tagCounts.entries
-        .where((entry) {
-          final tag = MealTag.values.cast<MealTag?>().firstWhere(
-            (value) => value?.value == entry.key,
-            orElse: () => null,
-          );
-          return tag != null &&
-              (positive
-                  ? tag.tone == MealTagTone.healthy
-                  : tag.tone == MealTagTone.unhealthy);
-        })
-        .map((entry) {
-          final tag = MealTag.fromString(entry.key);
-          return PeriodTagCount(
-            key: entry.key,
-            label: tag.label,
-            count: entry.value,
-          );
-        })
-        .toList()
-      ..sort((a, b) => b.count.compareTo(a.count));
+    final tags =
+        tagCounts.entries
+            .where((entry) {
+              final tag = MealTag.values.cast<MealTag?>().firstWhere(
+                (value) => value?.value == entry.key,
+                orElse: () => null,
+              );
+              return tag != null &&
+                  (positive
+                      ? tag.tone == MealTagTone.healthy
+                      : tag.tone == MealTagTone.unhealthy);
+            })
+            .map((entry) {
+              final tag = MealTag.fromString(entry.key);
+              return PeriodTagCount(
+                key: entry.key,
+                label: tag.label,
+                count: entry.value,
+              );
+            })
+            .toList()
+          ..sort((a, b) => b.count.compareTo(a.count));
 
     return tags.take(3).toList();
   }
@@ -130,7 +131,9 @@ class PeriodReviewService {
     if (calorieConsistencyRate >= 0.70) {
       guidance.add('Most logged days stayed close to target.');
     } else if (calorieConsistencyRate >= 0.40) {
-      guidance.add('Some logged days stayed close to target. Tightening a few outliers will help.');
+      guidance.add(
+        'Some logged days stayed close to target. Tightening a few outliers will help.',
+      );
     } else {
       guidance.add('Most logged days were well above or below target.');
     }

@@ -121,9 +121,7 @@ class CheckIn {
       periodKey: data['periodKey'] as String,
       periodStart: (data['periodStart'] as Timestamp).toDate(),
       periodEnd: (data['periodEnd'] as Timestamp).toDate(),
-      weightTrend: CheckInWeightTrend.fromString(
-        data['weightTrend'] as String,
-      ),
+      weightTrend: CheckInWeightTrend.fromString(data['weightTrend'] as String),
       targetDifficulty: CheckInDifficulty.fromString(
         data['targetDifficulty'] as String,
       ),

@@ -54,10 +54,7 @@ class CheckInRecommendationResult {
 }
 
 class CheckInService {
-  CheckInPeriod? currentPeriod({
-    required UserProfile profile,
-    DateTime? now,
-  }) {
+  CheckInPeriod? currentPeriod({required UserProfile profile, DateTime? now}) {
     final current = _startOfDay(now ?? DateTime.now());
     final anchor = _startOfDay(profile.createdAt);
     final daysSinceStart = current.difference(anchor).inDays;
