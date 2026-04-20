@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:lean_streak/core/constants/app_colors.dart';
 import 'package:lean_streak/helpers/health_calculator.dart';
 import 'package:lean_streak/models/user_profile.dart';
+import 'package:lean_streak/providers/auth_controller.dart';
 import 'package:lean_streak/providers/onboarding_controller.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -135,6 +136,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     });
 
     final isLoading = ref.watch(onboardingControllerProvider).isLoading;
+    final isSigningOut = ref.watch(authControllerProvider).isLoading;
     final preview = _preview;
 
     return Scaffold(
@@ -149,7 +151,22 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // ── Header ─────────────────────────────────────────────
-                SizedBox(height: 16),
+                SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: isLoading || isSigningOut
+                        ? null
+                        : () => ref
+                              .read(authControllerProvider.notifier)
+                              .signOut(),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    label: Text(
+                      isSigningOut ? 'Signing out...' : 'Back to sign in',
+                    ),
+                  ),
+                ),
+                SizedBox(height: 12),
                 Text(
                   'Let\'s get started',
                   style: TextStyle(

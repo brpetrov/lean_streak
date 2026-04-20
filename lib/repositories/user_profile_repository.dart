@@ -18,11 +18,20 @@ class UserProfileRepository {
   }
 
   /// Real-time stream. Emits null when the document does not exist.
-  Stream<UserProfile?> watchProfile(String uid) {
-    return _doc(uid).snapshots().map((snap) {
-      if (!snap.exists || snap.data() == null) return null;
-      return UserProfile.fromFirestore(snap);
-    });
+  Stream<UserProfile?> watchProfile(String uid) async* {
+    await for (final snap in _doc(
+      uid,
+    ).snapshots(includeMetadataChanges: true)) {
+      final data = snap.data();
+      if (!snap.exists || data == null) {
+        if (snap.metadata.isFromCache) {
+          continue;
+        }
+        yield null;
+        continue;
+      }
+      yield UserProfile.fromFirestore(snap);
+    }
   }
 
   /// Creates (or overwrites) the user's profile document.

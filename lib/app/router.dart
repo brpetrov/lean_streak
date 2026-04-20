@@ -9,6 +9,7 @@ import 'package:lean_streak/screens/account/account_settings_screen.dart';
 import 'package:lean_streak/screens/auth/auth_screen.dart';
 import 'package:lean_streak/screens/dashboard/dashboard_screen.dart';
 import 'package:lean_streak/screens/onboarding/onboarding_screen.dart';
+import 'package:lean_streak/screens/profile/profile_load_error_screen.dart';
 import 'package:lean_streak/screens/profile/profile_screen.dart';
 import 'package:lean_streak/screens/review/review_screen.dart';
 import 'package:lean_streak/screens/summary/summary_screen.dart';
@@ -22,6 +23,7 @@ class AppRoutes {
   static const splash = '/';
   static const auth = '/auth';
   static const onboarding = '/onboarding';
+  static const profileLoadError = '/profile-load-error';
   static const dashboard = '/dashboard';
   static const logMeal = '/log-meal';
   static const review = '/review';
@@ -47,7 +49,9 @@ class _RouterNotifier extends ChangeNotifier {
     ref.listen(userProfileProvider, (previous, next) {
       final prevDone = previous?.valueOrNull?.onboardingCompleted;
       final nextDone = next.valueOrNull?.onboardingCompleted;
-      if (prevDone != nextDone || previous?.isLoading != next.isLoading) {
+      if (prevDone != nextDone ||
+          previous?.isLoading != next.isLoading ||
+          previous?.hasError != next.hasError) {
         notifyListeners();
       }
     });
@@ -76,6 +80,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.onboarding,
         builder: (context, state) => const OnboardingScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.profileLoadError,
+        builder: (context, state) => const ProfileLoadErrorScreen(),
       ),
       GoRoute(
         path: AppRoutes.dashboard,
@@ -133,6 +141,12 @@ String? _redirect(Ref ref, GoRouterState state) {
     return location == AppRoutes.splash ? null : AppRoutes.splash;
   }
 
+  if (profileValue.hasError) {
+    return location == AppRoutes.profileLoadError
+        ? null
+        : AppRoutes.profileLoadError;
+  }
+
   final profile = profileValue.valueOrNull;
   final onboardingDone = profile?.onboardingCompleted ?? false;
 
@@ -144,6 +158,7 @@ String? _redirect(Ref ref, GoRouterState state) {
   // 4. Fully set up — bounce off auth / splash / onboarding.
   if (location == AppRoutes.splash ||
       location == AppRoutes.auth ||
+      location == AppRoutes.profileLoadError ||
       location == AppRoutes.onboarding) {
     return AppRoutes.dashboard;
   }

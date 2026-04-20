@@ -42,6 +42,7 @@ class AuthController extends AsyncNotifier<AuthStatus> {
   }
 
   Future<void> signOut() async {
+    state = const AsyncLoading();
     await FirebaseAuth.instance.signOut();
     state = const AsyncData(AuthStatus.idle);
   }
