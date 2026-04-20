@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:lean_streak/core/constants/app_colors.dart';
@@ -32,9 +33,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     if (!_formKey.currentState!.validate()) return;
     final controller = ref.read(authControllerProvider.notifier);
     if (_isSignIn) {
-      await controller.signIn(_emailController.text, _passwordController.text);
+      final success = await controller.signIn(
+        _emailController.text,
+        _passwordController.text,
+      );
+      if (success) {
+        TextInput.finishAutofillContext(shouldSave: true);
+      }
     } else {
       await controller.signUp(_emailController.text, _passwordController.text);
+      if (!ref.read(authControllerProvider).hasError) {
+        TextInput.finishAutofillContext(shouldSave: true);
+      }
     }
   }
 
@@ -98,275 +108,284 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
             child: Form(
               key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SizedBox(height: 32),
+              child: AutofillGroup(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(height: 32),
 
-                  // Logo
-                  Center(
-                    child: Container(
-                      width: 72,
-                      height: 72,
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.shadow,
-                            blurRadius: 18,
-                            offset: Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: const AppLogoMark(),
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  Center(
-                    child: Text(
-                      'LeanStreak',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 40),
-
-                  // Sign In / Sign Up toggle
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceVariant,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.all(4),
-                    child: Row(
-                      children: [
-                        _TabButton(
-                          label: 'Sign In',
-                          selected: _isSignIn,
-                          onTap: _isSignIn ? null : _switchMode,
-                        ),
-                        _TabButton(
-                          label: 'Sign Up',
-                          selected: !_isSignIn,
-                          onTap: !_isSignIn ? null : _switchMode,
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 28),
-
-                  // Verification success banner
-                  if (isVerificationSent) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.25),
-                        ),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.mark_email_read_outlined,
-                            color: AppColors.primary,
-                            size: 20,
-                          ),
-                          SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Verification email sent!',
-                                  style: TextStyle(
-                                    color: AppColors.primary,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                SizedBox(height: 2),
-                                Text(
-                                  'We sent a link to ${_emailController.text.trim()}. '
-                                  'Click it to verify your account, then sign in.',
-                                  style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
+                    // Logo
+                    Center(
+                      child: Container(
+                        width: 72,
+                        height: 72,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.shadow,
+                              blurRadius: 18,
+                              offset: Offset(0, 8),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
+                        child: const AppLogoMark(),
                       ),
                     ),
                     SizedBox(height: 16),
-                  ],
-
-                  // Error banner
-                  if (errorMessage != null) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.error.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: AppColors.error.withValues(alpha: 0.25),
+                    Center(
+                      child: Text(
+                        'LeanStreak',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                          letterSpacing: -0.5,
                         ),
                       ),
+                    ),
+                    SizedBox(height: 40),
+
+                    // Sign In / Sign Up toggle
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceVariant,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.all(4),
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.error_outline_rounded,
-                            color: AppColors.error,
-                            size: 18,
+                          _TabButton(
+                            label: 'Sign In',
+                            selected: _isSignIn,
+                            onTap: _isSignIn ? null : _switchMode,
                           ),
-                          SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              errorMessage,
-                              style: TextStyle(
-                                color: AppColors.error,
-                                fontSize: 14,
-                              ),
-                            ),
+                          _TabButton(
+                            label: 'Sign Up',
+                            selected: !_isSignIn,
+                            onTap: !_isSignIn ? null : _switchMode,
                           ),
                         ],
                       ),
                     ),
-                    SizedBox(height: 16),
-                  ],
+                    SizedBox(height: 28),
 
-                  // Email
-                  TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    decoration: InputDecoration(
-                      labelText: 'Email',
-                      prefixIcon: Icon(Icons.email_outlined),
-                    ),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) {
-                        return 'Please enter your email.';
-                      }
-                      final emailRe = RegExp(
-                        r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,}$',
-                      );
-                      if (!emailRe.hasMatch(v.trim())) {
-                        return 'Please enter a valid email.';
-                      }
-                      return null;
-                    },
-                  ),
-                  SizedBox(height: 16),
-
-                  // Password
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) {
-                      if (!isLoading) _submit();
-                    },
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: Icon(Icons.lock_outline_rounded),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
+                    // Verification success banner
+                    if (isVerificationSent) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
                         ),
-                        onPressed: () => setState(
-                          () => _obscurePassword = !_obscurePassword,
-                        ),
-                      ),
-                    ),
-                    validator: (v) {
-                      if (v == null || v.isEmpty) {
-                        return 'Please enter your password.';
-                      }
-                      if (!_isSignIn && v.length < 6) {
-                        return 'Password must be at least 6 characters.';
-                      }
-                      return null;
-                    },
-                  ),
-                  SizedBox(height: 28),
-
-                  // Submit
-                  SizedBox(
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: isLoading ? null : _submit,
-                      child: isLoading
-                          ? SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              _isSignIn ? 'Sign In' : 'Create Account',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                    ),
-                  ),
-                  SizedBox(height: 20),
-
-                  // Switch mode link
-                  Center(
-                    child: GestureDetector(
-                      onTap: _switchMode,
-                      child: RichText(
-                        text: TextSpan(
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: AppColors.textSecondary,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.25),
                           ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            TextSpan(
-                              text: _isSignIn
-                                  ? "Don't have an account? "
-                                  : 'Already have an account? ',
+                            Icon(
+                              Icons.mark_email_read_outlined,
+                              color: AppColors.primary,
+                              size: 20,
                             ),
-                            TextSpan(
-                              text: _isSignIn ? 'Sign Up' : 'Sign In',
-                              style: TextStyle(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w600,
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Verification email sent!',
+                                    style: TextStyle(
+                                      color: AppColors.primary,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'We sent a link to ${_emailController.text.trim()}. '
+                                    'Click it to verify your account, then sign in.',
+                                    style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  ),
+                      SizedBox(height: 16),
+                    ],
 
-                  SizedBox(height: 32),
-                ],
+                    // Error banner
+                    if (errorMessage != null) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppColors.error.withValues(alpha: 0.25),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.error_outline_rounded,
+                              color: AppColors.error,
+                              size: 18,
+                            ),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                errorMessage,
+                                style: TextStyle(
+                                  color: AppColors.error,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                    ],
+
+                    // Email
+                    TextFormField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [
+                        AutofillHints.username,
+                        AutofillHints.email,
+                      ],
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      decoration: InputDecoration(
+                        labelText: 'Email',
+                        prefixIcon: Icon(Icons.email_outlined),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Please enter your email.';
+                        }
+                        final emailRe = RegExp(
+                          r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,}$',
+                        );
+                        if (!emailRe.hasMatch(v.trim())) {
+                          return 'Please enter a valid email.';
+                        }
+                        return null;
+                      },
+                    ),
+                    SizedBox(height: 16),
+
+                    // Password
+                    TextFormField(
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      textInputAction: TextInputAction.done,
+                      autofillHints: _isSignIn
+                          ? const [AutofillHints.password]
+                          : const [AutofillHints.newPassword],
+                      onFieldSubmitted: (_) {
+                        if (!isLoading) _submit();
+                      },
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        prefixIcon: Icon(Icons.lock_outline_rounded),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                          ),
+                          onPressed: () => setState(
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
+                        ),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) {
+                          return 'Please enter your password.';
+                        }
+                        if (!_isSignIn && v.length < 6) {
+                          return 'Password must be at least 6 characters.';
+                        }
+                        return null;
+                      },
+                    ),
+                    SizedBox(height: 28),
+
+                    // Submit
+                    SizedBox(
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: isLoading ? null : _submit,
+                        child: isLoading
+                            ? SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(
+                                _isSignIn ? 'Sign In' : 'Create Account',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                      ),
+                    ),
+                    SizedBox(height: 20),
+
+                    // Switch mode link
+                    Center(
+                      child: GestureDetector(
+                        onTap: _switchMode,
+                        child: RichText(
+                          text: TextSpan(
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textSecondary,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: _isSignIn
+                                    ? "Don't have an account? "
+                                    : 'Already have an account? ',
+                              ),
+                              TextSpan(
+                                text: _isSignIn ? 'Sign Up' : 'Sign In',
+                                style: TextStyle(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    SizedBox(height: 32),
+                  ],
+                ),
               ),
             ),
           ),

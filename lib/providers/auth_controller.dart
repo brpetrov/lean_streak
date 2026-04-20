@@ -12,9 +12,9 @@ class AuthController extends AsyncNotifier<AuthStatus> {
   @override
   Future<AuthStatus> build() async => AuthStatus.idle;
 
-  Future<void> signIn(String email, String password) async {
+  Future<bool> signIn(String email, String password) async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
+    final nextState = await AsyncValue.guard(() async {
       final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
@@ -25,6 +25,8 @@ class AuthController extends AsyncNotifier<AuthStatus> {
       }
       return AuthStatus.idle;
     });
+    state = nextState;
+    return !nextState.hasError;
   }
 
   Future<void> signUp(String email, String password) async {
