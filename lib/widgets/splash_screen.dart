@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import 'app_logo_mark.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
@@ -51,10 +52,7 @@ class _Logo extends StatelessWidget {
               ),
             ],
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: Image.asset('assets/web/icon-192.png', fit: BoxFit.cover),
-          ),
+          child: const AppLogoMark(),
         ),
         SizedBox(height: 16),
         Text(

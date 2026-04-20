@@ -7,6 +7,7 @@ import 'package:lean_streak/core/constants/app_colors.dart';
 import 'package:lean_streak/providers/account_controller.dart';
 import 'package:lean_streak/providers/auth_controller.dart';
 import 'package:lean_streak/providers/theme_controller.dart';
+import 'package:lean_streak/widgets/app_logo_mark.dart';
 import 'package:lean_streak/widgets/password_confirm_dialog.dart';
 
 enum AppFrameTab { today, review, summary }
@@ -98,15 +99,7 @@ class _AppDrawer extends ConsumerWidget {
               padding: EdgeInsets.fromLTRB(20, 20, 20, 12),
               child: Row(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image(
-                      image: AssetImage('assets/web/icon-192.png'),
-                      width: 28,
-                      height: 28,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
+                  const AppLogoMark(size: 28),
                   SizedBox(width: 10),
                   Text(
                     'LeanStreak',
