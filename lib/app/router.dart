@@ -29,7 +29,7 @@ class AppRoutes {
   static const review = '/review';
   static const summary = '/summary';
   static const profile = '/profile';
-  static const healthSettings = '/health-settings';
+  static const planSettings = '/plan-settings';
 }
 
 // ---------------------------------------------------------------------------
@@ -102,8 +102,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const AccountSettingsScreen(),
       ),
       GoRoute(
-        path: AppRoutes.healthSettings,
-        builder: (context, state) => const HealthSettingsScreen(),
+        path: AppRoutes.planSettings,
+        builder: (context, state) => const PlanSettingsScreen(),
       ),
       // Additional routes wired in later phases:
       // GoRoute(path: AppRoutes.logMeal, ...),

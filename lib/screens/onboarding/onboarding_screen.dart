@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import 'package:lean_streak/core/constants/app_colors.dart';
 import 'package:lean_streak/helpers/health_calculator.dart';
 import 'package:lean_streak/models/user_profile.dart';
 import 'package:lean_streak/providers/auth_controller.dart';
 import 'package:lean_streak/providers/onboarding_controller.dart';
+import 'package:lean_streak/widgets/health_plan_preview_card.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -27,6 +27,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   Gender? _gender;
   ActivityLevel _activityLevel = ActivityLevel.sedentary;
+  TrainingFrequency _trainingFrequency = TrainingFrequency.none;
   WeightLossPace _weightLossPace = WeightLossPace.moderate;
 
   @override
@@ -41,7 +42,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   // ── Live preview ─────────────────────────────────────────────────────────
 
-  _GoalPreview? get _preview {
+  HealthPlanCalculation? get _preview {
     final currentWeight = double.tryParse(_currentWeightCtrl.text);
     final height = double.tryParse(_heightCtrl.text);
     final age = int.tryParse(_ageCtrl.text);
@@ -53,46 +54,23 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       return null;
     }
 
-    final calcBmr = HealthCalculator.bmr(currentWeight, height, age, _gender!);
-    final calcTdee = HealthCalculator.tdee(calcBmr, _activityLevel);
-    if (_weightLossPace == WeightLossPace.maintain) {
-      return _GoalPreview(
-        isMaintaining: true,
-        calories: HealthCalculator.maintenanceCalories(calcTdee),
-        pace: 0,
-        paceLevel: GoalPaceLevel.safe,
-        targetDate: DateTime.now(),
-        tdee: calcTdee,
-        clamped: false,
-      );
-    }
-
-    final targetWeight = double.tryParse(_targetWeightCtrl.text);
-    if (targetWeight == null || targetWeight >= currentWeight) {
+    final isMaintaining = _weightLossPace == WeightLossPace.maintain;
+    final targetWeight = isMaintaining
+        ? null
+        : double.tryParse(_targetWeightCtrl.text);
+    if (!isMaintaining &&
+        (targetWeight == null || targetWeight >= currentWeight)) {
       return null;
     }
-
-    final pace = HealthCalculator.goalPaceFromWeightLossPace(_weightLossPace);
-    final targetDate = HealthCalculator.targetDateFromWeightLossPace(
-      currentWeight,
-      targetWeight,
-      _weightLossPace,
-    );
-    final paceLevel = HealthCalculator.goalPaceLevel(pace);
-    final (:calories, :clamped) = HealthCalculator.dailyCalorieTargetFromPace(
-      tdee: calcTdee,
-      paceKgPerWeek: pace,
+    return HealthCalculator.calculatePlan(
+      currentWeightKg: currentWeight,
+      targetWeightKg: targetWeight,
+      heightCm: height,
+      age: age,
       gender: _gender!,
-    );
-
-    return _GoalPreview(
-      isMaintaining: false,
-      calories: calories,
-      pace: pace,
-      paceLevel: paceLevel,
-      targetDate: targetDate,
-      tdee: calcTdee,
-      clamped: clamped,
+      activityLevel: _activityLevel,
+      trainingFrequency: _trainingFrequency,
+      weightLossPace: _weightLossPace,
     );
   }
 
@@ -117,6 +95,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               ? null
               : double.parse(_targetWeightCtrl.text),
           activityLevel: _activityLevel,
+          trainingFrequency: _trainingFrequency,
           weightLossPace: _weightLossPace,
         );
   }
@@ -309,7 +288,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 // ── Your goal ──────────────────────────────────────────
                 const _SectionLabel('YOUR GOAL'),
                 Text(
-                  'Choose how quickly you want to lose weight, or maintain instead.',
+                  'Pace sets the calorie target. Target weight sets how long the plan takes.',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
@@ -379,9 +358,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 SizedBox(height: 28),
 
                 // ── Activity level ─────────────────────────────────────
-                const _SectionLabel('HOW ACTIVE ARE YOU?'),
+                const _SectionLabel('YOUR DAILY MOVEMENT'),
                 Text(
-                  'Used to estimate how many calories you burn each day.',
+                  'Your normal day outside workouts.',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
@@ -400,11 +379,30 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 ),
                 SizedBox(height: 20),
 
-                // ── Weight loss pace ───────────────────────────────────
+                const _SectionLabel('HOW OFTEN DO YOU TRAIN?'),
+                Text(
+                  'Structured workouts on top of your normal day.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                SizedBox(height: 12),
+                ...TrainingFrequency.values.map(
+                  (frequency) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _TrainingCard(
+                      frequency: frequency,
+                      selected: _trainingFrequency == frequency,
+                      onTap: () =>
+                          setState(() => _trainingFrequency = frequency),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 20),
 
-                // ── Plan preview ───────────────────────────────────────
                 if (preview != null) ...[
-                  _PlanPreviewCard(preview: preview),
+                  HealthPlanPreviewCard(preview: preview, title: 'Your plan'),
                   SizedBox(height: 20),
                 ],
 
@@ -439,30 +437,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       ),
     );
   }
-}
-
-// ---------------------------------------------------------------------------
-// Preview data class
-// ---------------------------------------------------------------------------
-
-class _GoalPreview {
-  const _GoalPreview({
-    required this.isMaintaining,
-    required this.calories,
-    required this.pace,
-    required this.paceLevel,
-    required this.targetDate,
-    required this.tdee,
-    required this.clamped,
-  });
-
-  final bool isMaintaining;
-  final double calories;
-  final double pace;
-  final GoalPaceLevel paceLevel;
-  final DateTime targetDate;
-  final double tdee;
-  final bool clamped;
 }
 
 // ---------------------------------------------------------------------------
@@ -542,21 +516,18 @@ class _ActivityCard extends StatelessWidget {
   final VoidCallback onTap;
 
   static String _title(ActivityLevel l) => switch (l) {
-    ActivityLevel.sedentary => 'Sedentary',
-    ActivityLevel.lightlyActive => 'Lightly active',
-    ActivityLevel.moderatelyActive => 'Moderately active',
-    ActivityLevel.veryActive => 'Very active',
+    ActivityLevel.sedentary => 'Mostly sitting',
+    ActivityLevel.lightlyActive => 'Light daily movement',
+    ActivityLevel.moderatelyActive => 'On feet often',
+    ActivityLevel.veryActive => 'Physical job or high movement',
   };
 
   static String _description(ActivityLevel l) => switch (l) {
-    ActivityLevel.sedentary =>
-      'Desk job, low steps, little structured exercise.',
-    ActivityLevel.lightlyActive =>
-      'Some walking, light exercise 1-3 days per week.',
+    ActivityLevel.sedentary => 'Desk day, low steps, little standing.',
+    ActivityLevel.lightlyActive => 'Some walking, errands, or light chores.',
     ActivityLevel.moderatelyActive =>
-      'Regular training 3-5 days per week or active daily routine.',
-    ActivityLevel.veryActive =>
-      'Hard training 6-7 days per week, physical job, or high movement.',
+      'Standing or walking for much of the day.',
+    ActivityLevel.veryActive => 'Manual work, high steps, or very active days.',
   };
 
   static IconData _icon(ActivityLevel l) => switch (l) {
@@ -576,6 +547,52 @@ class _ActivityCard extends StatelessWidget {
   );
 }
 
+// ── Training frequency card ────────────────────────────────────────────────
+
+class _TrainingCard extends StatelessWidget {
+  const _TrainingCard({
+    required this.frequency,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final TrainingFrequency frequency;
+  final bool selected;
+  final VoidCallback onTap;
+
+  static String _title(TrainingFrequency frequency) => switch (frequency) {
+    TrainingFrequency.none => 'No regular training',
+    TrainingFrequency.oneToTwo => '1 to 2 sessions/week',
+    TrainingFrequency.threeToFour => '3 to 4 sessions/week',
+    TrainingFrequency.fivePlus => '5+ sessions/week',
+  };
+
+  static String _description(TrainingFrequency frequency) =>
+      switch (frequency) {
+        TrainingFrequency.none => 'No planned workouts most weeks.',
+        TrainingFrequency.oneToTwo =>
+          'A couple of lifting, cardio, or sport days.',
+        TrainingFrequency.threeToFour => 'Regular training most weeks.',
+        TrainingFrequency.fivePlus => 'Frequent structured workouts.',
+      };
+
+  static IconData _icon(TrainingFrequency frequency) => switch (frequency) {
+    TrainingFrequency.none => Icons.block_rounded,
+    TrainingFrequency.oneToTwo => Icons.fitness_center_outlined,
+    TrainingFrequency.threeToFour => Icons.directions_run_outlined,
+    TrainingFrequency.fivePlus => Icons.bolt_rounded,
+  };
+
+  @override
+  Widget build(BuildContext context) => _SelectionCard(
+    title: _title(frequency),
+    description: _description(frequency),
+    icon: _icon(frequency),
+    selected: selected,
+    onTap: onTap,
+  );
+}
+
 // ── Weight loss pace card ──────────────────────────────────────────────────
 
 class _PaceCard extends StatelessWidget {
@@ -589,19 +606,19 @@ class _PaceCard extends StatelessWidget {
   final VoidCallback onTap;
 
   static String _title(WeightLossPace p) => switch (p) {
-    WeightLossPace.slow => 'Slow - 0.5 kg/week',
-    WeightLossPace.moderate => 'Moderate - 0.75 kg/week',
-    WeightLossPace.fast => 'Fast - 1.0 kg/week',
+    WeightLossPace.slow => 'Slow - 0.25 kg/week',
+    WeightLossPace.moderate => 'Moderate - 0.5 kg/week',
+    WeightLossPace.fast => 'Fast - 0.75 kg/week',
     WeightLossPace.maintain => 'Maintain weight',
   };
 
   static String _description(WeightLossPace p) => switch (p) {
     WeightLossPace.slow =>
-      'Gentle and easy to maintain. Takes longer but less restriction.',
+      'Gentle and easier to maintain over a longer period.',
     WeightLossPace.moderate =>
-      'Good balance of speed and sustainability. Recommended for most.',
+      'Steady progress with a moderate calorie deficit.',
     WeightLossPace.fast =>
-      'Faster results. Requires more discipline and consistency.',
+      'Faster results, but more restrictive for most people.',
     WeightLossPace.maintain =>
       'Keeps your calories around maintenance instead of creating a deficit.',
   };
@@ -699,162 +716,6 @@ class _SelectionCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-// ── Plan preview card ──────────────────────────────────────────────────────
-
-class _PlanPreviewCard extends StatelessWidget {
-  const _PlanPreviewCard({required this.preview});
-  final _GoalPreview preview;
-
-  Color get _color => switch (preview.paceLevel) {
-    GoalPaceLevel.safe => AppColors.veryGood,
-    GoalPaceLevel.caution => AppColors.bad,
-    GoalPaceLevel.warning => AppColors.veryBad,
-  };
-
-  String get _paceLabel => switch (preview.paceLevel) {
-    GoalPaceLevel.safe => 'Safe pace',
-    GoalPaceLevel.caution => 'Caution — fast pace',
-    GoalPaceLevel.warning => 'Very aggressive',
-  };
-
-  String get _paceMessage => switch (preview.paceLevel) {
-    GoalPaceLevel.safe => 'Healthy and sustainable.',
-    GoalPaceLevel.caution =>
-      'Faster than average. Stay consistent with your nutrition.',
-    GoalPaceLevel.warning =>
-      'Very aggressive. Make sure you stay fuelled and healthy.',
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final dateStr = DateFormat('d MMM yyyy').format(preview.targetDate);
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _color.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _color.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.insights_rounded, color: _color, size: 18),
-              SizedBox(width: 8),
-              Text(
-                'Your plan',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: _color,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _Stat(
-                  label: 'Daily target',
-                  value: '${preview.calories.round()} kcal',
-                ),
-              ),
-              Expanded(
-                child: _Stat(
-                  label: 'Loss per week',
-                  value: '${preview.pace.toStringAsFixed(2)} kg',
-                ),
-              ),
-              Expanded(
-                child: _Stat(label: 'Goal by', value: dateStr),
-              ),
-            ],
-          ),
-          SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                preview.paceLevel == GoalPaceLevel.safe
-                    ? Icons.check_circle_outline_rounded
-                    : Icons.warning_amber_rounded,
-                color: _color,
-                size: 16,
-              ),
-              SizedBox(width: 6),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _paceLabel,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: _color,
-                      ),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      _paceMessage,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    if (preview.clamped) ...[
-                      SizedBox(height: 4),
-                      Text(
-                        'Calorie target set to safe minimum floor.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Stat extends StatelessWidget {
-  const _Stat({required this.label, required this.value});
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-        ),
-        SizedBox(height: 2),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-      ],
     );
   }
 }

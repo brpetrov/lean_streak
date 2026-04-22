@@ -15,7 +15,11 @@ final activityScaleMigrationProvider = FutureProvider.autoDispose<void>((
 
   final profile = await ref.watch(userProfileProvider.future);
   if (profile == null) return;
-  if (profile.activityScaleVersion >= currentActivityScaleVersion) return;
+  final activityScaleCurrent =
+      profile.activityScaleVersion >= currentActivityScaleVersion;
+  final planCalculationCurrent =
+      profile.planCalculationVersion >= currentPlanCalculationVersion;
+  if (activityScaleCurrent && planCalculationCurrent) return;
 
   final migratedProfile = _migrateProfile(profile);
   await ref.read(userProfileRepositoryProvider).createProfile(migratedProfile);
@@ -25,49 +29,29 @@ final activityScaleMigrationProvider = FutureProvider.autoDispose<void>((
 });
 
 UserProfile _migrateProfile(UserProfile profile) {
-  final bmi = HealthCalculator.bmi(profile.currentWeightKg, profile.heightCm);
-  final bmr = HealthCalculator.bmr(
-    profile.currentWeightKg,
-    profile.heightCm,
-    profile.age,
-    profile.gender,
+  final plan = HealthCalculator.calculatePlan(
+    currentWeightKg: profile.currentWeightKg,
+    targetWeightKg: profile.targetWeightKg,
+    heightCm: profile.heightCm,
+    age: profile.age,
+    gender: profile.gender,
+    activityLevel: profile.activityLevel,
+    trainingFrequency: profile.trainingFrequency,
+    weightLossPace: profile.weightLossPace,
   );
-  final tdee = HealthCalculator.tdee(bmr, profile.activityLevel);
-  final isMaintaining = profile.weightLossPace == WeightLossPace.maintain;
-  final resolvedTargetWeight = isMaintaining
-      ? profile.currentWeightKg
-      : profile.targetWeightKg;
-  final pace = HealthCalculator.goalPaceFromWeightLossPace(
-    profile.weightLossPace,
-  );
-  final targetDate = isMaintaining
-      ? DateTime.now()
-      : HealthCalculator.targetDateFromWeightLossPace(
-          profile.currentWeightKg,
-          resolvedTargetWeight,
-          profile.weightLossPace,
-        );
-  final paceLevel = isMaintaining
-      ? GoalPaceLevel.safe
-      : HealthCalculator.goalPaceLevel(pace);
-  final calories = isMaintaining
-      ? HealthCalculator.maintenanceCalories(tdee)
-      : HealthCalculator.dailyCalorieTargetFromPace(
-          tdee: tdee,
-          paceKgPerWeek: pace,
-          gender: profile.gender,
-        ).calories;
 
   return profile.copyWith(
-    targetWeightKg: resolvedTargetWeight,
+    targetWeightKg: plan.targetWeightKg,
+    trainingFrequency: profile.trainingFrequency,
     activityScaleVersion: currentActivityScaleVersion,
-    targetDate: targetDate,
-    bmi: bmi,
-    bmr: bmr,
-    tdee: tdee,
-    dailyCalorieTarget: calories,
-    goalPaceKgPerWeek: pace,
-    goalPaceLevel: paceLevel,
+    planCalculationVersion: currentPlanCalculationVersion,
+    targetDate: plan.targetDate,
+    bmi: plan.bmi,
+    bmr: plan.bmr,
+    tdee: plan.tdee,
+    dailyCalorieTarget: plan.dailyCalorieTarget,
+    goalPaceKgPerWeek: plan.goalPaceKgPerWeek,
+    goalPaceLevel: plan.goalPaceLevel,
     updatedAt: DateTime.now(),
   );
 }

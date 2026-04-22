@@ -17,6 +17,7 @@ class OnboardingController extends AsyncNotifier<void> {
     required double currentWeightKg,
     required double? targetWeightKg,
     required ActivityLevel activityLevel,
+    required TrainingFrequency trainingFrequency,
     required WeightLossPace weightLossPace,
   }) async {
     state = const AsyncLoading();
@@ -25,36 +26,16 @@ class OnboardingController extends AsyncNotifier<void> {
       final email = ref.read(authStateProvider).valueOrNull?.email ?? '';
       if (uid == null) throw Exception('Not authenticated');
 
-      final calcBmi = HealthCalculator.bmi(currentWeightKg, heightCm);
-      final calcBmr = HealthCalculator.bmr(
-        currentWeightKg,
-        heightCm,
-        age,
-        gender,
+      final plan = HealthCalculator.calculatePlan(
+        currentWeightKg: currentWeightKg,
+        targetWeightKg: targetWeightKg,
+        heightCm: heightCm,
+        age: age,
+        gender: gender,
+        activityLevel: activityLevel,
+        trainingFrequency: trainingFrequency,
+        weightLossPace: weightLossPace,
       );
-      final calcTdee = HealthCalculator.tdee(calcBmr, activityLevel);
-      final isMaintaining = weightLossPace == WeightLossPace.maintain;
-      final resolvedTargetWeight = isMaintaining
-          ? currentWeightKg
-          : (targetWeightKg ?? currentWeightKg);
-      final pace = HealthCalculator.goalPaceFromWeightLossPace(weightLossPace);
-      final targetDate = isMaintaining
-          ? DateTime.now()
-          : HealthCalculator.targetDateFromWeightLossPace(
-              currentWeightKg,
-              resolvedTargetWeight,
-              weightLossPace,
-            );
-      final paceLevel = isMaintaining
-          ? GoalPaceLevel.safe
-          : HealthCalculator.goalPaceLevel(pace);
-      final calories = isMaintaining
-          ? HealthCalculator.maintenanceCalories(calcTdee)
-          : HealthCalculator.dailyCalorieTargetFromPace(
-              tdee: calcTdee,
-              paceKgPerWeek: pace,
-              gender: gender,
-            ).calories;
 
       final now = DateTime.now();
       final profile = UserProfile(
@@ -65,17 +46,19 @@ class OnboardingController extends AsyncNotifier<void> {
         gender: gender,
         heightCm: heightCm,
         currentWeightKg: currentWeightKg,
-        targetWeightKg: resolvedTargetWeight,
+        targetWeightKg: plan.targetWeightKg,
         activityLevel: activityLevel,
+        trainingFrequency: trainingFrequency,
         activityScaleVersion: currentActivityScaleVersion,
+        planCalculationVersion: currentPlanCalculationVersion,
         weightLossPace: weightLossPace,
-        targetDate: targetDate,
-        bmi: calcBmi,
-        bmr: calcBmr,
-        tdee: calcTdee,
-        dailyCalorieTarget: calories,
-        goalPaceKgPerWeek: pace,
-        goalPaceLevel: paceLevel,
+        targetDate: plan.targetDate,
+        bmi: plan.bmi,
+        bmr: plan.bmr,
+        tdee: plan.tdee,
+        dailyCalorieTarget: plan.dailyCalorieTarget,
+        goalPaceKgPerWeek: plan.goalPaceKgPerWeek,
+        goalPaceLevel: plan.goalPaceLevel,
         onboardingCompleted: true,
         createdAt: now,
         updatedAt: now,

@@ -411,8 +411,23 @@ Keep implementation simple and clearly commented.
 ## 9.4 TDEE formula
 
 ```text
+activityMultiplier = clamp(lifestyleMultiplier + trainingBonus, 1.20, 1.75)
 TDEE = BMR * activityMultiplier
 ```
+
+Lifestyle multipliers:
+
+- mostly sitting -> `1.25`
+- light daily movement -> `1.35`
+- on feet often -> `1.45`
+- physical job or high movement -> `1.60`
+
+Training bonuses:
+
+- no regular training -> `+0.00`
+- 1 to 2 sessions/week -> `+0.05`
+- 3 to 4 sessions/week -> `+0.10`
+- 5+ sessions/week -> `+0.15`
 
 ## 9.5 Goal pace logic
 
@@ -420,9 +435,9 @@ The app uses a pace choice instead of a manual target date picker.
 
 Map the selected pace to:
 
-- `slow` -> `0.50 kg/week`
-- `moderate` -> `0.75 kg/week`
-- `fast` -> `1.00 kg/week`
+- `slow` -> `0.25 kg/week`
+- `moderate` -> `0.50 kg/week`
+- `fast` -> `0.75 kg/week`
 
 Then calculate:
 
@@ -432,9 +447,9 @@ Then calculate:
 
 Use these rules:
 
-- `<= 0.75 kg/week` -> `safe`
-- `> 0.75 and <= 1.00 kg/week` -> `caution`
-- `> 1.00 kg/week` -> `warning`
+- `<= 0.50 kg/week` -> `safe`
+- `> 0.50 and <= 0.75 kg/week` -> `caution`
+- `> 0.75 kg/week` -> `warning`
 
 ## 9.6 Daily calorie target
 
@@ -465,6 +480,7 @@ If the calculated target is below the minimum floor:
 - clamp the target to the minimum
 - show the user a message that the goal pace is too aggressive
 - suggest extending the target date
+- estimate the goal date from the achievable pace at the calorie floor
 
 ---
 

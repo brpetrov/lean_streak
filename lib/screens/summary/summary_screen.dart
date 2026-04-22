@@ -392,7 +392,7 @@ class _MetricGrid extends StatelessWidget {
       children: [
         _MetricTile(label: 'Total calories', value: '${review.totalCalories}'),
         _MetricTile(
-          label: 'Avg calories/day',
+          label: 'Avg per logged day',
           value: review.averageCaloriesPerDay.toStringAsFixed(0),
         ),
         _MetricTile(label: 'Meals logged', value: '${review.totalMeals}'),

@@ -166,7 +166,7 @@ class _CheckInDialogState extends ConsumerState<_CheckInDialog> {
                   labelText: 'Current weight (optional)',
                   suffixText: 'kg',
                   helperText:
-                      'If you want to update this, we will save the check-in and let you review your health settings next.',
+                      'If you want to update this, we will save the check-in and let you review your plan settings next.',
                 ),
               ),
               SizedBox(height: 16),
@@ -187,7 +187,7 @@ class _CheckInDialogState extends ConsumerState<_CheckInDialog> {
             onPressed: controllerState.isLoading
                 ? null
                 : () => _save(CheckInDialogResult.savedAndOpenProfile),
-            child: Text('Save and open health settings'),
+            child: Text('Save and open plan settings'),
           ),
         FilledButton(
           onPressed: controllerState.isLoading

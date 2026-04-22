@@ -12,30 +12,31 @@ class PeriodReviewService {
   }) {
     final sortedSummaries = [...summaries]
       ..sort((a, b) => a.date.compareTo(b.date));
+    final activeSummaries = sortedSummaries.where(_hasLoggedActivity).toList();
     final sortedCheckIns = [...checkIns]
       ..sort((a, b) => a.periodStart.compareTo(b.periodStart));
 
     final daysInPeriod = endDate.difference(startDate).inDays + 1;
-    final loggedDays = sortedSummaries.length;
-    final totalCalories = sortedSummaries.fold<int>(
+    final loggedDays = activeSummaries.length;
+    final totalCalories = activeSummaries.fold<int>(
       0,
       (sum, summary) => sum + summary.totalCalories,
     );
-    final totalMeals = sortedSummaries.fold<int>(
+    final totalMeals = activeSummaries.fold<int>(
       0,
       (sum, summary) => sum + summary.mealCount,
     );
-    final averageCaloriesPerDay = daysInPeriod == 0
+    final averageCaloriesPerDay = loggedDays == 0
         ? 0.0
-        : totalCalories / daysInPeriod.toDouble();
+        : totalCalories / loggedDays.toDouble();
 
-    final greenDays = sortedSummaries
+    final greenDays = activeSummaries
         .where((summary) => summary.status == DailyStatus.green)
         .length;
-    final yellowDays = sortedSummaries
+    final yellowDays = activeSummaries
         .where((summary) => summary.status == DailyStatus.yellow)
         .length;
-    final redDays = sortedSummaries
+    final redDays = activeSummaries
         .where((summary) => summary.status == DailyStatus.red)
         .length;
     final calorieConsistencyRate = loggedDays == 0
@@ -43,22 +44,22 @@ class PeriodReviewService {
         : greenDays / loggedDays.toDouble();
 
     final aggregatedTags = <String, int>{};
-    for (final summary in sortedSummaries) {
+    for (final summary in activeSummaries) {
       for (final entry in summary.tagCounts.entries) {
         aggregatedTags[entry.key] =
             (aggregatedTags[entry.key] ?? 0) + entry.value;
       }
     }
 
-    final bestDay = sortedSummaries.isEmpty
+    final bestDay = activeSummaries.isEmpty
         ? null
-        : sortedSummaries.reduce((best, current) {
+        : activeSummaries.reduce((best, current) {
             if (current.deltaRatio < best.deltaRatio) return current;
             return current.date.compareTo(best.date) > 0 ? current : best;
           });
-    final worstDay = sortedSummaries.isEmpty
+    final worstDay = activeSummaries.isEmpty
         ? null
-        : sortedSummaries.reduce((worst, current) {
+        : activeSummaries.reduce((worst, current) {
             if (current.deltaRatio > worst.deltaRatio) return current;
             return current.date.compareTo(worst.date) > 0 ? current : worst;
           });
@@ -68,7 +69,7 @@ class PeriodReviewService {
       endDate: endDate,
       daysInPeriod: daysInPeriod,
       loggedDays: loggedDays,
-      summaries: sortedSummaries,
+      summaries: activeSummaries,
       totalCalories: totalCalories,
       averageCaloriesPerDay: averageCaloriesPerDay,
       totalMeals: totalMeals,
@@ -88,6 +89,12 @@ class PeriodReviewService {
         aggregatedTags: aggregatedTags,
       ),
     );
+  }
+
+  bool _hasLoggedActivity(DailySummary summary) {
+    return summary.mealCount > 0 ||
+        summary.totalCalories > 0 ||
+        summary.tagCounts.isNotEmpty;
   }
 
   List<PeriodTagCount> _topTags(
@@ -127,6 +134,11 @@ class PeriodReviewService {
     required Map<String, int> aggregatedTags,
   }) {
     final guidance = <String>[];
+
+    if (loggedDays == 0) {
+      guidance.add('No logged meals were found for this period.');
+      return guidance;
+    }
 
     if (calorieConsistencyRate >= 0.70) {
       guidance.add('Most logged days stayed close to target.');

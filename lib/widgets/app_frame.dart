@@ -114,11 +114,11 @@ class _AppDrawer extends ConsumerWidget {
             ),
             Divider(height: 1),
             ListTile(
-              leading: Icon(Icons.monitor_weight_outlined),
-              title: Text('Health & Goal Settings'),
+              leading: Icon(Icons.assignment_outlined),
+              title: Text('Plan Settings'),
               onTap: () {
                 Navigator.of(context).pop();
-                context.push(AppRoutes.healthSettings);
+                context.push(AppRoutes.planSettings);
               },
             ),
             ListTile(

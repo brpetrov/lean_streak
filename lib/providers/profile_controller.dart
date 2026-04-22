@@ -20,6 +20,7 @@ class ProfileController extends AsyncNotifier<void> {
     required double currentWeightKg,
     required double? targetWeightKg,
     required ActivityLevel activityLevel,
+    required TrainingFrequency trainingFrequency,
     required WeightLossPace weightLossPace,
   }) async {
     state = const AsyncLoading();
@@ -28,31 +29,16 @@ class ProfileController extends AsyncNotifier<void> {
       final uid = ref.read(currentUidProvider);
       if (uid == null) throw Exception('Not authenticated');
 
-      final bmi = HealthCalculator.bmi(currentWeightKg, heightCm);
-      final bmr = HealthCalculator.bmr(currentWeightKg, heightCm, age, gender);
-      final tdee = HealthCalculator.tdee(bmr, activityLevel);
-      final isMaintaining = weightLossPace == WeightLossPace.maintain;
-      final resolvedTargetWeight = isMaintaining
-          ? currentWeightKg
-          : (targetWeightKg ?? currentWeightKg);
-      final pace = HealthCalculator.goalPaceFromWeightLossPace(weightLossPace);
-      final targetDate = isMaintaining
-          ? DateTime.now()
-          : HealthCalculator.targetDateFromWeightLossPace(
-              currentWeightKg,
-              resolvedTargetWeight,
-              weightLossPace,
-            );
-      final paceLevel = isMaintaining
-          ? GoalPaceLevel.safe
-          : HealthCalculator.goalPaceLevel(pace);
-      final calories = isMaintaining
-          ? HealthCalculator.maintenanceCalories(tdee)
-          : HealthCalculator.dailyCalorieTargetFromPace(
-              tdee: tdee,
-              paceKgPerWeek: pace,
-              gender: gender,
-            ).calories;
+      final plan = HealthCalculator.calculatePlan(
+        currentWeightKg: currentWeightKg,
+        targetWeightKg: targetWeightKg,
+        heightCm: heightCm,
+        age: age,
+        gender: gender,
+        activityLevel: activityLevel,
+        trainingFrequency: trainingFrequency,
+        weightLossPace: weightLossPace,
+      );
 
       final updatedProfile = currentProfile.copyWith(
         name: name.trim(),
@@ -60,17 +46,19 @@ class ProfileController extends AsyncNotifier<void> {
         gender: gender,
         heightCm: heightCm,
         currentWeightKg: currentWeightKg,
-        targetWeightKg: resolvedTargetWeight,
+        targetWeightKg: plan.targetWeightKg,
         activityLevel: activityLevel,
+        trainingFrequency: trainingFrequency,
         activityScaleVersion: currentActivityScaleVersion,
+        planCalculationVersion: currentPlanCalculationVersion,
         weightLossPace: weightLossPace,
-        targetDate: targetDate,
-        bmi: bmi,
-        bmr: bmr,
-        tdee: tdee,
-        dailyCalorieTarget: calories,
-        goalPaceKgPerWeek: pace,
-        goalPaceLevel: paceLevel,
+        targetDate: plan.targetDate,
+        bmi: plan.bmi,
+        bmr: plan.bmr,
+        tdee: plan.tdee,
+        dailyCalorieTarget: plan.dailyCalorieTarget,
+        goalPaceKgPerWeek: plan.goalPaceKgPerWeek,
+        goalPaceLevel: plan.goalPaceLevel,
         updatedAt: DateTime.now(),
       );
 

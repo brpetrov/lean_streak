@@ -266,7 +266,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     ).showSnackBar(SnackBar(content: Text('Check-in saved.')));
 
     if (result == CheckInDialogResult.savedAndOpenProfile) {
-      context.push(AppRoutes.healthSettings);
+      context.push(AppRoutes.planSettings);
     }
   }
 }

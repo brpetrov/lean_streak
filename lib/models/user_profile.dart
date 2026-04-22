@@ -41,7 +41,37 @@ enum ActivityLevel {
   }
 }
 
-const currentActivityScaleVersion = 2;
+enum TrainingFrequency {
+  none('none'),
+  oneToTwo('one_to_two'),
+  threeToFour('three_to_four'),
+  fivePlus('five_plus');
+
+  const TrainingFrequency(this.value);
+  final String value;
+
+  static TrainingFrequency fromString(String s) {
+    return switch (s) {
+      'none' => TrainingFrequency.none,
+      'one_to_two' || 'oneToTwo' => TrainingFrequency.oneToTwo,
+      'three_to_four' || 'threeToFour' => TrainingFrequency.threeToFour,
+      'five_plus' || 'fivePlus' => TrainingFrequency.fivePlus,
+      _ => throw ArgumentError.value(s, 's', 'Unknown training frequency'),
+    };
+  }
+
+  static TrainingFrequency legacyDefaultFor(ActivityLevel activityLevel) {
+    return switch (activityLevel) {
+      ActivityLevel.sedentary => TrainingFrequency.none,
+      ActivityLevel.lightlyActive => TrainingFrequency.oneToTwo,
+      ActivityLevel.moderatelyActive => TrainingFrequency.threeToFour,
+      ActivityLevel.veryActive => TrainingFrequency.fivePlus,
+    };
+  }
+}
+
+const currentActivityScaleVersion = 3;
+const currentPlanCalculationVersion = 2;
 
 /// How quickly the user wants to lose weight — determines target date & deficit.
 enum WeightLossPace {
@@ -84,7 +114,9 @@ class UserProfile {
     required this.currentWeightKg,
     required this.targetWeightKg,
     required this.activityLevel,
+    required this.trainingFrequency,
     required this.activityScaleVersion,
+    required this.planCalculationVersion,
     required this.weightLossPace,
     required this.targetDate,
     required this.bmi,
@@ -109,7 +141,9 @@ class UserProfile {
 
   /// Physical activity level — used to compute TDEE.
   final ActivityLevel activityLevel;
+  final TrainingFrequency trainingFrequency;
   final int activityScaleVersion;
+  final int planCalculationVersion;
 
   /// Desired weight loss pace — used to compute target date and daily deficit.
   final WeightLossPace weightLossPace;
@@ -134,6 +168,10 @@ class UserProfile {
     DocumentSnapshot<Map<String, dynamic>> doc,
   ) {
     final d = doc.data()!;
+    final activityLevel = ActivityLevel.fromString(
+      d['activityLevel'] as String,
+    );
+    final trainingFrequencyValue = d['trainingFrequency'] as String?;
     return UserProfile(
       uid: d['uid'] as String,
       email: d['email'] as String,
@@ -143,8 +181,13 @@ class UserProfile {
       heightCm: (d['heightCm'] as num).toDouble(),
       currentWeightKg: (d['currentWeightKg'] as num).toDouble(),
       targetWeightKg: (d['targetWeightKg'] as num).toDouble(),
-      activityLevel: ActivityLevel.fromString(d['activityLevel'] as String),
+      activityLevel: activityLevel,
+      trainingFrequency: trainingFrequencyValue == null
+          ? TrainingFrequency.legacyDefaultFor(activityLevel)
+          : TrainingFrequency.fromString(trainingFrequencyValue),
       activityScaleVersion: (d['activityScaleVersion'] as num?)?.round() ?? 1,
+      planCalculationVersion:
+          (d['planCalculationVersion'] as num?)?.round() ?? 1,
       weightLossPace: WeightLossPace.fromString(d['weightLossPace'] as String),
       targetDate: (d['targetDate'] as Timestamp).toDate(),
       bmi: (d['bmi'] as num).toDouble(),
@@ -169,7 +212,9 @@ class UserProfile {
     'currentWeightKg': currentWeightKg,
     'targetWeightKg': targetWeightKg,
     'activityLevel': activityLevel.value,
+    'trainingFrequency': trainingFrequency.value,
     'activityScaleVersion': activityScaleVersion,
+    'planCalculationVersion': planCalculationVersion,
     'weightLossPace': weightLossPace.value,
     'targetDate': Timestamp.fromDate(targetDate),
     'bmi': bmi,
@@ -195,7 +240,9 @@ class UserProfile {
     double? currentWeightKg,
     double? targetWeightKg,
     ActivityLevel? activityLevel,
+    TrainingFrequency? trainingFrequency,
     int? activityScaleVersion,
+    int? planCalculationVersion,
     WeightLossPace? weightLossPace,
     DateTime? targetDate,
     double? bmi,
@@ -218,7 +265,10 @@ class UserProfile {
       currentWeightKg: currentWeightKg ?? this.currentWeightKg,
       targetWeightKg: targetWeightKg ?? this.targetWeightKg,
       activityLevel: activityLevel ?? this.activityLevel,
+      trainingFrequency: trainingFrequency ?? this.trainingFrequency,
       activityScaleVersion: activityScaleVersion ?? this.activityScaleVersion,
+      planCalculationVersion:
+          planCalculationVersion ?? this.planCalculationVersion,
       weightLossPace: weightLossPace ?? this.weightLossPace,
       targetDate: targetDate ?? this.targetDate,
       bmi: bmi ?? this.bmi,
