@@ -560,22 +560,9 @@ class _MonthPreviewCard extends ConsumerWidget {
                   SizedBox(height: 16),
                   SizedBox(
                     height: 96,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: days.map((day) {
-                        final summary =
-                            summariesByDate[DateFormat(
-                              'yyyy-MM-dd',
-                            ).format(day)];
-                        return Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 1.5,
-                            ),
-                            child: _MonthPreviewBar(day: day, summary: summary),
-                          ),
-                        );
-                      }).toList(),
+                    child: _MonthPreviewBars(
+                      days: days,
+                      summariesByDate: summariesByDate,
                     ),
                   ),
                   SizedBox(height: 14),
@@ -631,6 +618,52 @@ class _MonthPreviewCard extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+class _MonthPreviewBars extends StatelessWidget {
+  const _MonthPreviewBars({required this.days, required this.summariesByDate});
+
+  final List<DateTime> days;
+  final Map<String, DailySummary> summariesByDate;
+
+  @override
+  Widget build(BuildContext context) {
+    if (days.length <= 3) {
+      return Align(
+        alignment: Alignment.bottomLeft,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: days.map((day) {
+            return Padding(
+              padding: const EdgeInsets.only(right: 7),
+              child: SizedBox(
+                width: 12,
+                height: double.infinity,
+                child: _MonthPreviewBar(day: day, summary: _summaryFor(day)),
+              ),
+            );
+          }).toList(),
+        ),
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: days.map((day) {
+        return Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 1.5),
+            child: _MonthPreviewBar(day: day, summary: _summaryFor(day)),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  DailySummary? _summaryFor(DateTime day) {
+    return summariesByDate[DateFormat('yyyy-MM-dd').format(day)];
   }
 }
 
