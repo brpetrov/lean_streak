@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -624,41 +625,46 @@ class _MonthPreviewCard extends ConsumerWidget {
 class _MonthPreviewBars extends StatelessWidget {
   const _MonthPreviewBars({required this.days, required this.summariesByDate});
 
+  static const _minimumVisibleSlots = 12;
+  static const _maxBarWidth = 12.0;
+  static const _slotGutter = 3.0;
+
   final List<DateTime> days;
   final Map<String, DailySummary> summariesByDate;
 
   @override
   Widget build(BuildContext context) {
-    if (days.length <= 3) {
-      return Align(
-        alignment: Alignment.bottomLeft,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final slotCount = math.max(days.length, _minimumVisibleSlots);
+        final slotWidth = constraints.maxWidth / slotCount;
+        final barWidth = math.min(
+          _maxBarWidth,
+          math.max(2.0, slotWidth - _slotGutter),
+        );
+
+        return Row(
           crossAxisAlignment: CrossAxisAlignment.end,
-          children: days.map((day) {
-            return Padding(
-              padding: const EdgeInsets.only(right: 7),
-              child: SizedBox(
-                width: 12,
-                height: double.infinity,
-                child: _MonthPreviewBar(day: day, summary: _summaryFor(day)),
+          children: List.generate(slotCount, (index) {
+            final day = index < days.length ? days[index] : null;
+
+            return Expanded(
+              child: Center(
+                child: day == null
+                    ? const SizedBox.shrink()
+                    : SizedBox(
+                        width: barWidth,
+                        height: double.infinity,
+                        child: _MonthPreviewBar(
+                          day: day,
+                          summary: _summaryFor(day),
+                        ),
+                      ),
               ),
             );
-          }).toList(),
-        ),
-      );
-    }
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: days.map((day) {
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 1.5),
-            child: _MonthPreviewBar(day: day, summary: _summaryFor(day)),
-          ),
+          }),
         );
-      }).toList(),
+      },
     );
   }
 
