@@ -23,7 +23,7 @@ Future<void> showLogMealSheet(BuildContext context, {Meal? existingMeal}) {
   );
 }
 
-enum _CalorieInputMode { ai, manual }
+enum _CalorieInputMode { voice, manual, ai }
 
 class _LogMealSheet extends ConsumerStatefulWidget {
   const _LogMealSheet({this.existingMeal});
@@ -51,12 +51,19 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
   bool _speechAvailable = false;
   bool _speechInitialized = false;
 
+  // Voice mode state
+  String _voiceRecognizedText = '';
+  VoiceMealParsed? _voiceParsed;
+  bool _voiceListening = false;
+  bool _voiceParsing = false;
+  String? _voiceError;
+
   bool get _isEditing => widget.existingMeal != null;
 
   @override
   void initState() {
     super.initState();
-    _inputMode = _isEditing ? _CalorieInputMode.manual : _CalorieInputMode.ai;
+    _inputMode = _isEditing ? _CalorieInputMode.manual : _CalorieInputMode.voice;
 
     final meal = widget.existingMeal;
     if (meal == null) return;
@@ -168,6 +175,89 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
     });
   }
 
+  Future<void> _startVoiceListening() async {
+    if (_speechToText.isListening) {
+      await _speechToText.stop();
+      if (mounted) setState(() => _voiceListening = false);
+      return;
+    }
+
+    final available = await _ensureSpeechReady();
+    if (!available) {
+      setState(() =>
+          _voiceError = 'Speech input is not available on this device.');
+      return;
+    }
+
+    setState(() {
+      _voiceError = null;
+      _voiceRecognizedText = '';
+      _voiceParsed = null;
+      _voiceListening = true;
+    });
+
+    await _speechToText.listen(
+      onResult: (result) {
+        if (!mounted) return;
+        setState(() => _voiceRecognizedText = result.recognizedWords);
+      },
+      listenFor: const Duration(seconds: 15),
+      pauseFor: const Duration(seconds: 3),
+      listenOptions: SpeechListenOptions(partialResults: true),
+    );
+  }
+
+  void _useVoiceResult() {
+    if (_voiceParsed == null) return;
+    _nameController.text = _voiceParsed!.name;
+    _caloriesController.text = _voiceParsed!.kcal.toString();
+    setState(() {
+      _voiceParsed = null;
+      _voiceRecognizedText = '';
+    });
+  }
+
+  void _retryVoice() {
+    setState(() {
+      _voiceParsed = null;
+      _voiceRecognizedText = '';
+      _voiceError = null;
+      _voiceParsing = false;
+    });
+    _startVoiceListening();
+  }
+
+  Future<void> _parseVoiceWithAi() async {
+    setState(() {
+      _voiceParsing = true;
+      _voiceError = null;
+    });
+
+    try {
+      final result = await ref
+          .read(calorieEstimateServiceProvider)
+          .parseVoice(_voiceRecognizedText);
+
+      if (!mounted) return;
+      setState(() {
+        _voiceParsed = result;
+        _voiceParsing = false;
+      });
+    } on CalorieEstimateException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _voiceError = e.message;
+        _voiceParsing = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _voiceError = 'Could not process voice input. Try again.';
+        _voiceParsing = false;
+      });
+    }
+  }
+
   Future<void> _toggleSpeechInput() async {
     if (_speechToText.isListening) {
       await _speechToText.stop();
@@ -236,17 +326,32 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
 
   void _onSpeechError(SpeechRecognitionError error) {
     if (!mounted) return;
+    final message = error.errorMsg == 'error_no_match'
+        ? 'No speech detected. Tap the mic to try again.'
+        : 'Speech input failed. Try again.';
     setState(() {
-      _speechError = error.errorMsg == 'error_no_match'
-          ? 'No speech was recognised. Try again.'
-          : 'Speech input failed. ${error.errorMsg}';
+      if (_inputMode == _CalorieInputMode.voice) {
+        _voiceError = message;
+        _voiceListening = false;
+      } else {
+        _speechError = message;
+      }
     });
   }
 
   void _onSpeechStatus(String status) {
     if (!mounted) return;
     if (status == 'done' || status == 'notListening') {
-      setState(() {});
+      setState(() {
+        if (_inputMode == _CalorieInputMode.voice) {
+          _voiceListening = false;
+          if (_voiceRecognizedText.isNotEmpty &&
+              _voiceParsed == null &&
+              !_voiceParsing) {
+            _parseVoiceWithAi();
+          }
+        }
+      });
     }
   }
 
@@ -259,9 +364,10 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
       AiUsageRepository.dailyLimit,
     );
     final limitReached = remaining == 0;
-    final effectiveInputMode = limitReached && !_isEditing
-        ? _CalorieInputMode.manual
-        : _inputMode;
+    final effectiveInputMode =
+        _inputMode == _CalorieInputMode.ai && limitReached
+            ? _CalorieInputMode.manual
+            : _inputMode;
     final mediaQuery = MediaQuery.of(context);
     final footerBottomPadding =
         (mediaQuery.viewInsets.bottom > 0
@@ -305,6 +411,50 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
                       color: AppColors.textPrimary,
                     ),
                   ),
+                  SizedBox(height: 16),
+                  _ModeTabBar(
+                    selectedMode: effectiveInputMode,
+                    aiEnabled: !limitReached,
+                    onChanged: (mode) => setState(() {
+                      if (_speechToText.isListening) _speechToText.stop();
+                      _inputMode = mode;
+                      _estimate = null;
+                      _estimateError = null;
+                      _voiceParsed = null;
+                      _voiceRecognizedText = '';
+                      _voiceError = null;
+                      _voiceListening = false;
+                      _voiceParsing = false;
+                    }),
+                  ),
+                  SizedBox(height: 20),
+                  if (effectiveInputMode == _CalorieInputMode.voice)
+                    _VoiceInputSection(
+                      isListening: _voiceListening,
+                      parsing: _voiceParsing,
+                      recognizedText: _voiceRecognizedText,
+                      parsed: _voiceParsed,
+                      error: _voiceError,
+                      onToggleListening: _startVoiceListening,
+                      onUse: _useVoiceResult,
+                      onRetry: _retryVoice,
+                    )
+                  else if (effectiveInputMode == _CalorieInputMode.ai)
+                    _AiEstimatorSection(
+                      remaining: remaining,
+                      descriptionController: _descriptionController,
+                      estimating: _estimating,
+                      estimate: _estimate,
+                      estimateError: _estimateError,
+                      speechError: _speechError,
+                      isListening: _speechToText.isListening,
+                      speechEnabled: _speechAvailable || !_speechInitialized,
+                      onToggleSpeech: _toggleSpeechInput,
+                      onEstimate: _runEstimate,
+                      onUse: _useEstimate,
+                    )
+                  else
+                    _ManualCaloriesField(controller: _caloriesController),
                   SizedBox(height: 24),
                   const _SectionLabel('MEAL NAME (OPTIONAL)'),
                   SizedBox(height: 10),
@@ -340,35 +490,6 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
                       ),
                     ),
                   ),
-                  SizedBox(height: 24),
-                  const _SectionLabel('CALORIES'),
-                  SizedBox(height: 10),
-                  _CalorieInputModeSelector(
-                    selectedMode: effectiveInputMode,
-                    aiEnabled: !limitReached,
-                    onChanged: (mode) => setState(() {
-                      _inputMode = mode;
-                      _estimate = null;
-                      _estimateError = null;
-                    }),
-                  ),
-                  SizedBox(height: 12),
-                  if (effectiveInputMode == _CalorieInputMode.ai)
-                    _AiEstimatorSection(
-                      remaining: remaining,
-                      descriptionController: _descriptionController,
-                      estimating: _estimating,
-                      estimate: _estimate,
-                      estimateError: _estimateError,
-                      speechError: _speechError,
-                      isListening: _speechToText.isListening,
-                      speechEnabled: _speechAvailable || !_speechInitialized,
-                      onToggleSpeech: _toggleSpeechInput,
-                      onEstimate: _runEstimate,
-                      onUse: _useEstimate,
-                    )
-                  else
-                    _ManualCaloriesField(controller: _caloriesController),
                   SizedBox(height: 24),
                   const _SectionLabel('TAGS'),
                   SizedBox(height: 4),
@@ -678,8 +799,8 @@ class _AiEstimatorSection extends StatelessWidget {
   }
 }
 
-class _CalorieInputModeSelector extends StatelessWidget {
-  const _CalorieInputModeSelector({
+class _ModeTabBar extends StatelessWidget {
+  const _ModeTabBar({
     required this.selectedMode,
     required this.aiEnabled,
     required this.onChanged,
@@ -691,85 +812,71 @@ class _CalorieInputModeSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _InputModeButton(
-            label: 'Estimate with AI',
-            selected: selectedMode == _CalorieInputMode.ai,
-            enabled: aiEnabled,
-            icon: Icons.auto_awesome_rounded,
-            onPressed: () => onChanged(_CalorieInputMode.ai),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Row(
+        children: [
+          _tab(_CalorieInputMode.voice, Icons.mic_rounded, 'Voice', true),
+          _tab(_CalorieInputMode.manual, Icons.edit_rounded, 'Manual', true),
+          _tab(
+            _CalorieInputMode.ai,
+            Icons.auto_awesome_rounded,
+            'AI',
+            aiEnabled,
           ),
-        ),
-        SizedBox(width: 10),
-        Expanded(
-          child: _InputModeButton(
-            label: 'Enter Manually',
-            selected: selectedMode == _CalorieInputMode.manual,
-            enabled: true,
-            icon: Icons.edit_rounded,
-            onPressed: () => onChanged(_CalorieInputMode.manual),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
-}
 
-class _InputModeButton extends StatelessWidget {
-  const _InputModeButton({
-    required this.label,
-    required this.selected,
-    required this.enabled,
-    required this.icon,
-    required this.onPressed,
-  });
-
-  final String label;
-  final bool selected;
-  final bool enabled;
-  final IconData icon;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final foregroundColor = !enabled
+  Widget _tab(
+    _CalorieInputMode mode,
+    IconData icon,
+    String label,
+    bool enabled,
+  ) {
+    final isSelected = selectedMode == mode;
+    final color = !enabled
         ? AppColors.textDisabled
-        : selected
-        ? AppColors.primary
-        : AppColors.textPrimary;
+        : isSelected
+            ? AppColors.primary
+            : AppColors.textSecondary;
 
-    return Material(
-      color: selected
-          ? AppColors.primary.withValues(alpha: 0.08)
-          : AppColors.surfaceVariant,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: enabled ? onPressed : null,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+    return Expanded(
+      child: GestureDetector(
+        onTap: enabled ? () => onChanged(mode) : null,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: selected ? AppColors.primary : AppColors.divider,
-            ),
+            color: isSelected ? AppColors.surface : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: AppColors.shadow,
+                      blurRadius: 4,
+                      offset: Offset(0, 1),
+                    ),
+                  ]
+                : null,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 16, color: foregroundColor),
-              SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  enabled ? label : 'AI limit reached',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: foregroundColor,
-                  ),
+              Icon(icon, size: 15, color: color),
+              SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  color: color,
                 ),
               ),
             ],
@@ -954,6 +1061,195 @@ class _TagGroup extends StatelessWidget {
             );
           }).toList(),
         ),
+      ],
+    );
+  }
+}
+
+class _VoiceInputSection extends StatelessWidget {
+  const _VoiceInputSection({
+    required this.isListening,
+    required this.parsing,
+    required this.recognizedText,
+    required this.parsed,
+    required this.error,
+    required this.onToggleListening,
+    required this.onUse,
+    required this.onRetry,
+  });
+
+  final bool isListening;
+  final bool parsing;
+  final String recognizedText;
+  final VoiceMealParsed? parsed;
+  final String? error;
+  final VoidCallback onToggleListening;
+  final VoidCallback onUse;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final showIdle =
+        !isListening && !parsing && parsed == null && recognizedText.isEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Describe what you ate, e.g. "I had sweets, around 300 calories"',
+          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+        ),
+        SizedBox(height: 16),
+        Center(
+          child: GestureDetector(
+            onTap: parsed == null && !parsing ? onToggleListening : null,
+            child: Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isListening
+                    ? AppColors.primary.withValues(alpha: 0.1)
+                    : AppColors.surfaceVariant,
+              ),
+              child: Icon(
+                isListening ? Icons.mic : Icons.mic_none_rounded,
+                size: 36,
+                color:
+                    isListening ? AppColors.primary : AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ),
+        if (isListening) ...[
+          SizedBox(height: 12),
+          Center(
+            child: Text(
+              'Listening...',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+        if (recognizedText.isNotEmpty && parsed == null) ...[
+          SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              recognizedText,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 15, color: AppColors.textPrimary),
+            ),
+          ),
+        ],
+        if (parsing) ...[
+          SizedBox(height: 16),
+          Center(
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+        ],
+        if (parsed != null) ...[
+          SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.tagPositiveBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.tagPositive),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  parsed!.name,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  '${parsed!.kcal} kcal',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.tagPositive,
+                  ),
+                ),
+                SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.tonal(
+                        onPressed: onRetry,
+                        style: FilledButton.styleFrom(
+                          foregroundColor: AppColors.textPrimary,
+                          backgroundColor: AppColors.surfaceVariant,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: Text(
+                          'Try again',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: onUse,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: Text(
+                          'Use this',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+        if (showIdle) ...[
+          SizedBox(height: 8),
+          Center(
+            child: Text(
+              'Tap the mic to start',
+              style: TextStyle(fontSize: 13, color: AppColors.textDisabled),
+            ),
+          ),
+        ],
+        if (error != null) ...[
+          SizedBox(height: 8),
+          Text(
+            error!,
+            style: TextStyle(fontSize: 13, color: AppColors.error),
+          ),
+        ],
       ],
     );
   }

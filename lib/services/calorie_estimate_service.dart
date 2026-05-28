@@ -9,6 +9,7 @@ import 'package:lean_streak/core/config/api_keys.dart';
 import 'package:lean_streak/repositories/ai_usage_repository.dart';
 
 typedef CalorieEstimate = ({int kcal, String note});
+typedef VoiceMealParsed = ({String name, int kcal});
 
 class DailyLimitExceededException implements Exception {
   const DailyLimitExceededException();
@@ -38,6 +39,15 @@ class CalorieEstimateService {
       'Do not include any other text. '
       'Be concise and practical, estimate for a typical portion.\n\n'
       'Meal: {input}';
+
+  static const String _voicePromptTemplate =
+      'You are a nutrition assistant. The user spoke a voice note about a meal.\n'
+      'Extract the meal name and calorie count.\n'
+      'If the user stated a calorie amount, use that exact number.\n'
+      'If no calorie amount was mentioned, estimate calories for a typical portion.\n'
+      'Respond with ONLY a JSON object: {"name": "<short meal name>", "kcal": <integer>}.\n'
+      'Do not include any other text.\n\n'
+      'Transcript: {input}';
 
   Future<CalorieEstimate> estimate(String uid, String description) async {
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
@@ -80,6 +90,41 @@ class CalorieEstimateService {
     } catch (error, st) {
       debugPrint('CalorieEstimateService error: $error\n$st');
       throw CalorieEstimateException('Could not estimate calories right now.');
+    }
+  }
+
+  Future<VoiceMealParsed> parseVoice(String transcript) async {
+    try {
+      final model = GenerativeModel(model: _modelId, apiKey: ApiKeys.gemini);
+      final prompt =
+          _voicePromptTemplate.replaceFirst('{input}', transcript.trim());
+      final response = await _generateWithRetries(model, prompt);
+      final raw = response.text?.trim() ?? '';
+
+      if (raw.isEmpty) {
+        throw const CalorieEstimateException('Empty response from model.');
+      }
+
+      final jsonStr = raw
+          .replaceAll(RegExp(r'```(?:json)?\s*'), '')
+          .replaceAll('```', '')
+          .trim();
+
+      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+      final name = map['name'] as String;
+      final kcal = (map['kcal'] as num).toInt();
+
+      return (name: name, kcal: kcal);
+    } on CalorieEstimateException {
+      rethrow;
+    } on ServerException catch (error, st) {
+      debugPrint('CalorieEstimateService voice parse error: $error\n$st');
+      throw CalorieEstimateException(_friendlyServerError(error.message));
+    } catch (error, st) {
+      debugPrint('CalorieEstimateService voice parse error: $error\n$st');
+      throw CalorieEstimateException(
+        'Could not process voice input right now.',
+      );
     }
   }
 
