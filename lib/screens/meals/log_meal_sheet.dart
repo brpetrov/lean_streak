@@ -176,9 +176,12 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
   }
 
   Future<void> _startVoiceListening() async {
+    // Tapping while listening = stop now and process what we have.
     if (_speechToText.isListening) {
       await _speechToText.stop();
-      if (mounted) setState(() => _voiceListening = false);
+      if (!mounted) return;
+      setState(() => _voiceListening = false);
+      _maybeParseVoice();
       return;
     }
 
@@ -200,11 +203,27 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
       onResult: (result) {
         if (!mounted) return;
         setState(() => _voiceRecognizedText = result.recognizedWords);
+        // A final result means the engine has settled — process immediately
+        // instead of waiting on the (unreliable) status callback.
+        if (result.finalResult) {
+          setState(() => _voiceListening = false);
+          _maybeParseVoice();
+        }
       },
-      listenFor: const Duration(seconds: 15),
+      listenFor: const Duration(seconds: 30),
       pauseFor: const Duration(seconds: 3),
       listenOptions: SpeechListenOptions(partialResults: true),
     );
+  }
+
+  /// Sends the captured transcript to the AI parser, guarding against
+  /// double-triggers from overlapping stop/finalResult/status events.
+  void _maybeParseVoice() {
+    if (_voiceRecognizedText.trim().isNotEmpty &&
+        _voiceParsed == null &&
+        !_voiceParsing) {
+      _parseVoiceWithAi();
+    }
   }
 
   void _useVoiceResult() {
@@ -342,16 +361,13 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
   void _onSpeechStatus(String status) {
     if (!mounted) return;
     if (status == 'done' || status == 'notListening') {
-      setState(() {
-        if (_inputMode == _CalorieInputMode.voice) {
-          _voiceListening = false;
-          if (_voiceRecognizedText.isNotEmpty &&
-              _voiceParsed == null &&
-              !_voiceParsing) {
-            _parseVoiceWithAi();
-          }
-        }
-      });
+      if (_inputMode == _CalorieInputMode.voice) {
+        setState(() => _voiceListening = false);
+        // Fallback path in case finalResult never arrived.
+        _maybeParseVoice();
+      } else {
+        setState(() {});
+      }
     }
   }
 
@@ -1125,7 +1141,7 @@ class _VoiceInputSection extends StatelessWidget {
           SizedBox(height: 12),
           Center(
             child: Text(
-              'Listening...',
+              'Listening… tap the mic when done',
               style: TextStyle(
                 fontSize: 14,
                 color: AppColors.primary,

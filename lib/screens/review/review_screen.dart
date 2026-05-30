@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import 'package:lean_streak/core/constants/app_colors.dart';
 import 'package:lean_streak/models/daily_summary.dart';
+import 'package:lean_streak/providers/daily_summary_provider.dart';
+import 'package:lean_streak/providers/past_day_edit_provider.dart';
 import 'package:lean_streak/providers/review_provider.dart';
+import 'package:lean_streak/repositories/day_edit_repository.dart';
 import 'package:lean_streak/widgets/app_frame.dart';
 import 'package:lean_streak/widgets/responsive_page.dart';
 
@@ -670,7 +674,9 @@ void _showReviewInfoDialog(BuildContext context) {
         content: Text(
           'This screen shows your logged days in a weekly or monthly calendar. '
           'Each day is colored by how close your calories were to target. '
-          'Tap any colored day to open its details.',
+          'Tap any colored day to open its details — from there you can also '
+          'add or remove calories to correct a past day (up to '
+          '${DayEditRepository.monthlyLimit} edits per month).',
         ),
         actions: [
           TextButton(
@@ -684,127 +690,419 @@ void _showReviewInfoDialog(BuildContext context) {
 }
 
 void _showReviewDaySheet(BuildContext context, DailySummary summary) {
-  final date = DateTime.tryParse(summary.date);
-  final statusColor = _statusColor(summary.status);
-
   showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
     backgroundColor: AppColors.surface,
-    builder: (context) {
-      return SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  date == null
-                      ? summary.date
-                      : DateFormat('EEEE, d MMMM yyyy').format(date),
+    builder: (context) => _ReviewDaySheet(initialSummary: summary),
+  );
+}
+
+class _ReviewDaySheet extends ConsumerWidget {
+  const _ReviewDaySheet({required this.initialSummary});
+
+  final DailySummary initialSummary;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Watch the live summary so metrics update immediately after an edit,
+    // falling back to the snapshot we were opened with.
+    final summary =
+        ref.watch(dailySummaryForDateProvider(initialSummary.date)).valueOrNull ??
+        initialSummary;
+    final date = DateTime.tryParse(summary.date);
+    final statusColor = _statusColor(summary.status);
+    final editsUsed = ref.watch(dayEditsThisMonthProvider).valueOrNull ?? 0;
+    final editsLeft =
+        (DayEditRepository.monthlyLimit - editsUsed).clamp(
+          0,
+          DayEditRepository.monthlyLimit,
+        );
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                date == null
+                    ? summary.date
+                    : DateFormat('EEEE, d MMMM yyyy').format(date),
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  summary.status.label,
                   style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
+                    color: statusColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              SizedBox(height: 20),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  _DetailMetricCard(
+                    label: 'Calories',
+                    value: '${summary.totalCalories}',
+                  ),
+                  _DetailMetricCard(
+                    label: 'Target',
+                    value: '${summary.targetCalories}',
+                  ),
+                  _DetailMetricCard(
+                    label: 'Delta',
+                    value: _deltaLabel(summary.calorieDelta),
+                    valueColor: _deltaColor(summary.calorieDelta),
+                  ),
+                  _DetailMetricCard(
+                    label: 'Meals',
+                    value: '${summary.mealCount}',
+                  ),
+                ],
+              ),
+              SizedBox(height: 24),
+              Text(
+                _statusDescription(summary),
+                style: TextStyle(
+                  fontSize: 15,
+                  color: AppColors.textSecondary,
+                  height: 1.5,
+                ),
+              ),
+              if (summary.tagCounts.isNotEmpty) ...[
+                SizedBox(height: 24),
+                Text(
+                  'Tag totals',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
                   ),
                 ),
                 SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    summary.status.label,
-                    style: TextStyle(
-                      color: statusColor,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 20),
                 Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    _DetailMetricCard(
-                      label: 'Calories',
-                      value: '${summary.totalCalories}',
-                    ),
-                    _DetailMetricCard(
-                      label: 'Target',
-                      value: '${summary.targetCalories}',
-                    ),
-                    _DetailMetricCard(
-                      label: 'Delta',
-                      value: _deltaLabel(summary.calorieDelta),
-                      valueColor: _deltaColor(summary.calorieDelta),
-                    ),
-                    _DetailMetricCard(
-                      label: 'Meals',
-                      value: '${summary.mealCount}',
-                    ),
-                  ],
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: summary.tagCounts.entries.map((entry) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceVariant,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '${_formatTagLabel(entry.key)} (${entry.value})',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
-                SizedBox(height: 24),
-                Text(
-                  _statusDescription(summary),
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: AppColors.textSecondary,
-                    height: 1.5,
-                  ),
-                ),
-                if (summary.tagCounts.isNotEmpty) ...[
-                  SizedBox(height: 24),
-                  Text(
-                    'Tag totals',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: summary.tagCounts.entries.map((entry) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceVariant,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          '${_formatTagLabel(entry.key)} (${entry.value})',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
               ],
-            ),
+              SizedBox(height: 24),
+              _AdjustCaloriesSection(
+                summary: summary,
+                editsLeft: editsLeft,
+              ),
+            ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _AdjustCaloriesSection extends ConsumerWidget {
+  const _AdjustCaloriesSection({
+    required this.summary,
+    required this.editsLeft,
+  });
+
+  final DailySummary summary;
+  final int editsLeft;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isSaving = ref.watch(pastDayEditControllerProvider).isLoading;
+    final canEdit = editsLeft > 0;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Adjust calories',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              Builder(
+                builder: (context) {
+                  final badgeColor = canEdit ? AppColors.bad : AppColors.error;
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: badgeColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: badgeColor.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          canEdit
+                              ? Icons.info_outline_rounded
+                              : Icons.lock_outline_rounded,
+                          size: 13,
+                          color: badgeColor,
+                        ),
+                        SizedBox(width: 5),
+                        Text(
+                          '$editsLeft left this month',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: badgeColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+          SizedBox(height: 6),
+          Text(
+            'Forgot to log something, or over-counted? Add or remove calories '
+            'for this day. Limited to ${DayEditRepository.monthlyLimit} edits per month.',
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
+          SizedBox(height: 14),
+          FilledButton.tonal(
+            onPressed: canEdit && !isSaving
+                ? () => _openAdjustDialog(context, ref)
+                : null,
+            style: FilledButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              backgroundColor: AppColors.surface,
+              minimumSize: const Size.fromHeight(46),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: isSaving
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: AppColors.primary,
+                    ),
+                  )
+                : Text(
+                    canEdit ? 'Adjust calories' : 'No edits left this month',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openAdjustDialog(BuildContext context, WidgetRef ref) async {
+    final delta = await showDialog<double>(
+      context: context,
+      builder: (_) => _AdjustCaloriesDialog(currentTotal: summary.totalCalories),
+    );
+
+    if (delta == null || delta == 0) return;
+
+    try {
+      await ref.read(pastDayEditControllerProvider.notifier).adjustCalories(
+            date: summary.date,
+            delta: delta,
+          );
+      if (!context.mounted) return;
+      final verb = delta > 0 ? 'Added' : 'Removed';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$verb ${delta.abs().round()} kcal.')),
       );
-    },
-  );
+    } on EditLimitExceededException {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No edits left this month.')),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not adjust calories. Try again.')),
+      );
+    }
+  }
+}
+
+class _AdjustCaloriesDialog extends StatefulWidget {
+  const _AdjustCaloriesDialog({required this.currentTotal});
+
+  final int currentTotal;
+
+  @override
+  State<_AdjustCaloriesDialog> createState() => _AdjustCaloriesDialogState();
+}
+
+class _AdjustCaloriesDialogState extends State<_AdjustCaloriesDialog> {
+  final _controller = TextEditingController();
+  bool _isAdding = true;
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _confirm() {
+    final amount = int.tryParse(_controller.text.trim());
+    if (amount == null || amount <= 0) {
+      setState(() => _error = 'Enter a calorie amount greater than 0.');
+      return;
+    }
+
+    final delta = (_isAdding ? amount : -amount).toDouble();
+    final newTotal = widget.currentTotal + delta;
+    if (newTotal < 0) {
+      setState(() => _error = 'That would push the day below 0 kcal.');
+      return;
+    }
+
+    Navigator.of(context).pop(delta);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final amount = int.tryParse(_controller.text.trim()) ?? 0;
+    final preview = _isAdding
+        ? widget.currentTotal + amount
+        : widget.currentTotal - amount;
+
+    return AlertDialog(
+      backgroundColor: AppColors.surface,
+      title: Text('Adjust calories'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SegmentedButton<bool>(
+            showSelectedIcon: false,
+            segments: [
+              ButtonSegment(
+                value: true,
+                label: Text('Add'),
+                icon: Icon(Icons.add_rounded, size: 18),
+              ),
+              ButtonSegment(
+                value: false,
+                label: Text('Remove'),
+                icon: Icon(Icons.remove_rounded, size: 18),
+              ),
+            ],
+            selected: {_isAdding},
+            onSelectionChanged: (selection) =>
+                setState(() => _isAdding = selection.first),
+          ),
+          SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onChanged: (_) => setState(() => _error = null),
+            decoration: InputDecoration(
+              hintText: 'Calories',
+              suffixText: 'kcal',
+              filled: true,
+              fillColor: AppColors.surfaceVariant,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          SizedBox(height: 12),
+          Text(
+            'New day total: ${preview < 0 ? widget.currentTotal : preview} kcal',
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+          if (_error != null) ...[
+            SizedBox(height: 8),
+            Text(
+              _error!,
+              style: TextStyle(fontSize: 13, color: AppColors.error),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _confirm,
+          style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+          child: Text('Apply'),
+        ),
+      ],
+    );
+  }
 }
 
 class _DetailMetricCard extends StatelessWidget {
