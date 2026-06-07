@@ -114,6 +114,14 @@ class _AppDrawer extends ConsumerWidget {
             ),
             Divider(height: 1),
             ListTile(
+              leading: Icon(Icons.monitor_weight_outlined),
+              title: Text('Weight & Progress'),
+              onTap: () {
+                Navigator.of(context).pop();
+                context.push(AppRoutes.progress);
+              },
+            ),
+            ListTile(
               leading: Icon(Icons.assignment_outlined),
               title: Text('Plan Settings'),
               onTap: () {

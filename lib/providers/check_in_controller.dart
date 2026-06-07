@@ -1,9 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:lean_streak/models/check_in.dart';
+import 'package:lean_streak/models/weight_entry.dart';
 import 'package:lean_streak/providers/auth_provider.dart';
 import 'package:lean_streak/providers/check_in_provider.dart';
 import 'package:lean_streak/providers/check_in_state_provider.dart';
+import 'package:lean_streak/providers/user_profile_provider.dart';
+import 'package:lean_streak/providers/weight_entry_provider.dart';
 import 'package:lean_streak/services/check_in_service.dart';
 
 class CheckInController extends AsyncNotifier<void> {
@@ -74,6 +77,23 @@ class CheckInController extends AsyncNotifier<void> {
       );
 
       await ref.read(checkInRepositoryProvider).saveCheckIn(uid, checkIn);
+
+      // A weight entered during the check-in flows into the shared weight
+      // history and triggers the same automatic plan recalculation as an
+      // ad-hoc log.
+      if (updatedWeightKg != null) {
+        final profile = ref.read(userProfileProvider).valueOrNull;
+        if (profile != null) {
+          await ref
+              .read(weightLogServiceProvider)
+              .logWeight(
+                profile: profile,
+                weightKg: updatedWeightKg,
+                source: WeightSource.checkIn,
+              );
+        }
+      }
+
       ref.invalidate(currentCheckInAvailabilityProvider);
       state = const AsyncData(null);
       return recommendation;

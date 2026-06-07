@@ -18,8 +18,10 @@ import 'package:lean_streak/providers/log_meal_controller.dart';
 import 'package:lean_streak/providers/meal_provider.dart';
 import 'package:lean_streak/providers/review_provider.dart';
 import 'package:lean_streak/providers/user_profile_provider.dart';
+import 'package:lean_streak/providers/weight_entry_provider.dart';
 import 'package:lean_streak/screens/dashboard/helpers/check_in_dialog.dart';
 import 'package:lean_streak/screens/meals/log_meal_sheet.dart';
+import 'package:lean_streak/screens/progress/helpers/log_weight_dialog.dart';
 import 'package:lean_streak/services/check_in_service.dart';
 import 'package:lean_streak/widgets/app_frame.dart';
 import 'package:lean_streak/widgets/responsive_page.dart';
@@ -311,6 +313,8 @@ class _DashboardContent extends ConsumerWidget {
               _CalorieOverviewCard(summary: summary),
               SizedBox(height: 16),
               _StatusCard(summary: summary),
+              SizedBox(height: 16),
+              const _WeightCard(),
               SizedBox(height: 24),
               Row(
                 children: [
@@ -802,6 +806,83 @@ class _StatusCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _WeightCard extends ConsumerWidget {
+  const _WeightCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final entriesAsync = ref.watch(weightEntriesProvider);
+    final entries = entriesAsync.valueOrNull ?? const [];
+    final latest = entries.isNotEmpty ? entries.last.weightKg : null;
+
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: () => context.push(AppRoutes.progress),
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.shadow,
+                blurRadius: 18,
+                offset: Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.monitor_weight_outlined, color: AppColors.primary),
+              SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Weight',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      latest != null
+                          ? 'Latest: ${latest.toStringAsFixed(1)} kg'
+                          : 'Log your weight to track progress',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton(
+                onPressed: () async {
+                  final result = await showLogWeightDialog(context);
+                  if (!context.mounted || result == null) return;
+                  final message = result.targetChanged
+                      ? 'Weight saved. New target: ${result.newCalorieTarget} kcal.'
+                      : 'Weight saved.';
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(message)));
+                },
+                child: Text('Log'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -11,6 +11,7 @@ import 'package:lean_streak/screens/dashboard/dashboard_screen.dart';
 import 'package:lean_streak/screens/onboarding/onboarding_screen.dart';
 import 'package:lean_streak/screens/profile/profile_load_error_screen.dart';
 import 'package:lean_streak/screens/profile/profile_screen.dart';
+import 'package:lean_streak/screens/progress/progress_screen.dart';
 import 'package:lean_streak/screens/review/review_screen.dart';
 import 'package:lean_streak/screens/summary/summary_screen.dart';
 import 'package:lean_streak/widgets/splash_screen.dart';
@@ -30,6 +31,7 @@ class AppRoutes {
   static const summary = '/summary';
   static const profile = '/profile';
   static const planSettings = '/plan-settings';
+  static const progress = '/progress';
 }
 
 // ---------------------------------------------------------------------------
@@ -104,6 +106,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.planSettings,
         builder: (context, state) => const PlanSettingsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.progress,
+        builder: (context, state) => const ProgressScreen(),
       ),
       // Additional routes wired in later phases:
       // GoRoute(path: AppRoutes.logMeal, ...),
