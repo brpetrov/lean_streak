@@ -13,22 +13,38 @@ import 'package:lean_streak/providers/log_meal_controller.dart';
 import 'package:lean_streak/repositories/ai_usage_repository.dart';
 import 'package:lean_streak/services/calorie_estimate_service.dart';
 
-Future<void> showLogMealSheet(BuildContext context, {Meal? existingMeal}) {
-  return showModalBottomSheet(
+/// Resolves to true when the meal was saved.
+Future<bool?> showLogMealSheet(
+  BuildContext context, {
+  Meal? existingMeal,
+  String? initialName,
+  int? initialCalories,
+}) {
+  return showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _LogMealSheet(existingMeal: existingMeal),
+    builder: (_) => _LogMealSheet(
+      existingMeal: existingMeal,
+      initialName: initialName,
+      initialCalories: initialCalories,
+    ),
   );
 }
 
 enum _CalorieInputMode { voice, manual, ai }
 
 class _LogMealSheet extends ConsumerStatefulWidget {
-  const _LogMealSheet({this.existingMeal});
+  const _LogMealSheet({
+    this.existingMeal,
+    this.initialName,
+    this.initialCalories,
+  });
 
   final Meal? existingMeal;
+  final String? initialName;
+  final int? initialCalories;
 
   @override
   ConsumerState<_LogMealSheet> createState() => _LogMealSheetState();
@@ -63,7 +79,11 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
   @override
   void initState() {
     super.initState();
-    _inputMode = _isEditing ? _CalorieInputMode.manual : _CalorieInputMode.voice;
+    _inputMode = _CalorieInputMode.manual;
+    _nameController.text = widget.initialName ?? '';
+    if (widget.initialCalories != null) {
+      _caloriesController.text = widget.initialCalories.toString();
+    }
 
     final meal = widget.existingMeal;
     if (meal == null) return;
@@ -117,7 +137,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
       return;
     }
 
-    Navigator.of(context).pop();
+    Navigator.of(context).pop(true);
   }
 
   Future<void> _runEstimate() async {

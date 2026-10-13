@@ -20,6 +20,7 @@ import 'package:lean_streak/providers/review_provider.dart';
 import 'package:lean_streak/providers/user_profile_provider.dart';
 import 'package:lean_streak/providers/weight_entry_provider.dart';
 import 'package:lean_streak/screens/dashboard/helpers/check_in_dialog.dart';
+import 'package:lean_streak/screens/dashboard/helpers/quick_log_card.dart';
 import 'package:lean_streak/screens/meals/log_meal_sheet.dart';
 import 'package:lean_streak/screens/progress/helpers/log_weight_dialog.dart';
 import 'package:lean_streak/services/check_in_service.dart';
@@ -136,12 +137,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     return AppFrame(
       title: 'Today',
       currentTab: AppFrameTab.today,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => showLogMealSheet(context),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
-        child: Icon(Icons.add_rounded),
-      ),
       body: profileAsync.when(
         data: (profile) {
           if (profile == null) {
@@ -308,13 +303,9 @@ class _DashboardContent extends ConsumerWidget {
             children: [
               _HeaderSection(date: date, name: profile.name),
               SizedBox(height: 20),
-              _MonthPreviewCard(date: date, onOpenReview: onOpenReview),
+              const QuickLogCard(),
               SizedBox(height: 16),
               _CalorieOverviewCard(summary: summary),
-              SizedBox(height: 16),
-              _StatusCard(summary: summary),
-              SizedBox(height: 16),
-              const _WeightCard(),
               SizedBox(height: 24),
               Row(
                 children: [
@@ -343,6 +334,12 @@ class _DashboardContent extends ConsumerWidget {
                 const _EmptyMealsState()
               else
                 ..._buildMealCards(meals),
+              SizedBox(height: 24),
+              _MonthPreviewCard(date: date, onOpenReview: onOpenReview),
+              SizedBox(height: 16),
+              _StatusCard(summary: summary),
+              SizedBox(height: 16),
+              const _WeightCard(),
             ],
           ),
         ),
