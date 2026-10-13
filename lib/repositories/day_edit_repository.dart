@@ -10,7 +10,7 @@ class DayEditRepository {
   DayEditRepository(this._db);
   final FirebaseFirestore _db;
 
-  static const int monthlyLimit = 3;
+  static const int monthlyLimit = 10;
 
   DocumentReference<Map<String, dynamic>> _doc(String uid, String monthKey) =>
       _db.collection('users').doc(uid).collection('day_edits').doc(monthKey);
