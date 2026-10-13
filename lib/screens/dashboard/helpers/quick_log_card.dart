@@ -73,6 +73,7 @@ class _QuickLogCardState extends ConsumerState<QuickLogCard> {
         .submit(
           name: entry.name,
           calories: entry.kcal!.toDouble(),
+          proteinGrams: entry.protein?.toDouble(),
           tags: const [],
         );
     if (!mounted) return;
@@ -95,10 +96,13 @@ class _QuickLogCardState extends ConsumerState<QuickLogCard> {
           .read(calorieEstimateServiceProvider)
           .estimate(uid, text);
       if (!mounted) return;
-      _setText('$text ${result.kcal} kcal');
+      _setText('$text ${_amounts(result.kcal, result.protein)}');
       _aiNote = result.note;
     });
   }
+
+  String _amounts(int kcal, int? protein) =>
+      protein == null ? '$kcal kcal' : '$kcal kcal ${protein}g protein';
 
   /// Shared busy and error handling for the estimate and voice AI calls.
   Future<void> _runAi(Future<void> Function() action) async {
@@ -178,7 +182,7 @@ class _QuickLogCardState extends ConsumerState<QuickLogCard> {
           .read(calorieEstimateServiceProvider)
           .parseVoice(transcript);
       if (!mounted) return;
-      _setText('${result.name} ${result.kcal} kcal');
+      _setText('${result.name} ${_amounts(result.kcal, result.protein)}');
     });
   }
 
@@ -198,6 +202,7 @@ class _QuickLogCardState extends ConsumerState<QuickLogCard> {
       context,
       initialName: entry.name,
       initialCalories: entry.kcal,
+      initialProtein: entry.protein,
     );
     if (saved == true && mounted) _reset();
   }
@@ -326,13 +331,17 @@ class _QuickLogCardState extends ConsumerState<QuickLogCard> {
         AppColors.textSecondary,
         false,
       ),
-      (name: final name, kcal: null) => (
+      (name: final name, kcal: null, protein: _) => (
         '${name ?? 'Meal'} · no calories yet. Add a number or tap Estimate.',
         AppColors.textSecondary,
         false,
       ),
-      (name: final name, kcal: final kcal) => (
-        [?name, '$kcal kcal'].join(' · '),
+      (name: final name, kcal: final kcal, protein: final protein) => (
+        [
+          ?name,
+          '$kcal kcal',
+          if (protein != null) '$protein g protein',
+        ].join(' · '),
         AppColors.textPrimary,
         true,
       ),

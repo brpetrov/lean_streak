@@ -7,6 +7,7 @@ void main() {
       expect(parseQuickLog('chicken wrap 450'), (
         name: 'Chicken wrap',
         kcal: 450,
+        protein: null,
       ));
     });
 
@@ -14,18 +15,22 @@ void main() {
       expect(parseQuickLog('450 kcal chicken wrap'), (
         name: 'Chicken wrap',
         kcal: 450,
+        protein: null,
       ));
       expect(parseQuickLog('porridge 320kcal'), (
         name: 'Porridge',
         kcal: 320,
+        protein: null,
       ));
       expect(parseQuickLog('apple 80 cal'), (
         name: 'Apple',
         kcal: 80,
+        protein: null,
       ));
       expect(parseQuickLog('Pizza slice 300 Calories'), (
         name: 'Pizza slice',
         kcal: 300,
+        protein: null,
       ));
     });
 
@@ -33,10 +38,12 @@ void main() {
       expect(parseQuickLog('2 eggs on toast 300'), (
         name: '2 eggs on toast',
         kcal: 300,
+        protein: null,
       ));
       expect(parseQuickLog('2 eggs on toast'), (
         name: '2 eggs on toast',
         kcal: null,
+        protein: null,
       ));
     });
 
@@ -44,6 +51,7 @@ void main() {
       expect(parseQuickLog('sunday roast 1,200 kcal'), (
         name: 'Sunday roast',
         kcal: 1200,
+        protein: null,
       ));
     });
 
@@ -51,10 +59,12 @@ void main() {
       expect(parseQuickLog('chicken wrap - 450'), (
         name: 'Chicken wrap',
         kcal: 450,
+        protein: null,
       ));
       expect(parseQuickLog('chicken wrap, 450 kcal'), (
         name: 'Chicken wrap',
         kcal: 450,
+        protein: null,
       ));
     });
 
@@ -62,19 +72,52 @@ void main() {
       expect(parseQuickLog('2 calzones'), (
         name: '2 calzones',
         kcal: null,
+        protein: null,
       ));
     });
 
     test('allows calories without a name', () {
-      expect(parseQuickLog('450'), (name: null, kcal: 450));
-      expect(parseQuickLog('450 kcal'), (name: null, kcal: 450));
+      expect(parseQuickLog('450'), (name: null, kcal: 450, protein: null));
+      expect(parseQuickLog('450 kcal'), (name: null, kcal: 450, protein: null));
     });
 
     test('returns nothing for empty input or zero calories', () {
-      expect(parseQuickLog('   '), (name: null, kcal: null));
+      expect(parseQuickLog('   '), (name: null, kcal: null, protein: null));
       expect(parseQuickLog('water 0'), (
         name: 'Water',
         kcal: null,
+        protein: null,
+      ));
+    });
+
+    test('reads protein written either way round', () {
+      expect(parseQuickLog('chicken wrap 450 35g protein'), (
+        name: 'Chicken wrap',
+        kcal: 450,
+        protein: 35,
+      ));
+      expect(parseQuickLog('musaka 640 kcal 31 g protein'), (
+        name: 'Musaka',
+        kcal: 640,
+        protein: 31,
+      ));
+      expect(parseQuickLog('shake 250 protein 30g'), (
+        name: 'Shake',
+        kcal: 250,
+        protein: 30,
+      ));
+      expect(parseQuickLog('chicken salad 350 kcal 40 grams of protein'), (
+        name: 'Chicken salad',
+        kcal: 350,
+        protein: 40,
+      ));
+    });
+
+    test('does not mistake a weight for protein', () {
+      expect(parseQuickLog('chicken 200g 330'), (
+        name: 'Chicken 200g',
+        kcal: 330,
+        protein: null,
       ));
     });
   });

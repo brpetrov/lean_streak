@@ -234,4 +234,19 @@ void main() {
       );
     });
   });
+
+  group('protein target', () {
+    test('scales goal weight by training frequency', () {
+      int target(TrainingFrequency frequency) =>
+          HealthCalculator.proteinTargetGrams(
+            targetWeightKg: 75,
+            trainingFrequency: frequency,
+          );
+
+      expect(target(TrainingFrequency.none), 90);
+      expect(target(TrainingFrequency.oneToTwo), 120);
+      expect(target(TrainingFrequency.threeToFour), 135);
+      expect(target(TrainingFrequency.fivePlus), 150);
+    });
+  });
 }

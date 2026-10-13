@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 
 import 'package:lean_streak/app/router.dart';
 import 'package:lean_streak/core/constants/app_colors.dart';
+import 'package:lean_streak/helpers/health_calculator.dart';
 import 'package:lean_streak/models/daily_summary.dart';
 import 'package:lean_streak/models/meal.dart';
 import 'package:lean_streak/models/user_profile.dart';
@@ -291,6 +292,9 @@ class _DashboardContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final bottomPadding = MediaQuery.of(context).padding.bottom + 32;
+    final proteinLogged = meals
+        .fold<double>(0, (sum, meal) => sum + (meal.proteinGrams ?? 0))
+        .round();
 
     return ListView(
       padding: EdgeInsets.zero,
@@ -305,7 +309,17 @@ class _DashboardContent extends ConsumerWidget {
               SizedBox(height: 20),
               const QuickLogCard(),
               SizedBox(height: 16),
-              _CalorieOverviewCard(summary: summary),
+              _CalorieOverviewCard(
+                summary: summary,
+                proteinLogged: proteinLogged,
+                proteinTarget: HealthCalculator.proteinTargetGrams(
+                  targetWeightKg: profile.targetWeightKg,
+                  trainingFrequency: profile.trainingFrequency,
+                ),
+                mealsWithoutProtein: meals
+                    .where((meal) => meal.proteinGrams == null)
+                    .length,
+              ),
               SizedBox(height: 24),
               Row(
                 children: [
@@ -401,9 +415,17 @@ class _HeaderSection extends StatelessWidget {
 }
 
 class _CalorieOverviewCard extends StatelessWidget {
-  const _CalorieOverviewCard({required this.summary});
+  const _CalorieOverviewCard({
+    required this.summary,
+    required this.proteinLogged,
+    required this.proteinTarget,
+    required this.mealsWithoutProtein,
+  });
 
   final DailySummary summary;
+  final int proteinLogged;
+  final int proteinTarget;
+  final int mealsWithoutProtein;
 
   @override
   Widget build(BuildContext context) {
@@ -468,6 +490,48 @@ class _CalorieOverviewCard extends StatelessWidget {
               ),
             ],
           ),
+          SizedBox(height: 18),
+          Row(
+            children: [
+              Text(
+                'Protein',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '$proteinLogged / $proteinTarget g',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: proteinTarget <= 0
+                  ? 0
+                  : (proteinLogged / proteinTarget).clamp(0.0, 1.0),
+              minHeight: 8,
+              color: AppColors.primary,
+              backgroundColor: AppColors.surfaceVariant,
+            ),
+          ),
+          if (mealsWithoutProtein > 0) ...[
+            SizedBox(height: 6),
+            Text(
+              '$mealsWithoutProtein ${mealsWithoutProtein == 1 ? 'meal' : 'meals'} '
+              'not counted (no protein info)',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+          ],
         ],
       ),
     );
@@ -1013,13 +1077,28 @@ class _MealCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Text(
-                '${meal.calories.round()} kcal',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${meal.calories.round()} kcal',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  if (meal.proteinGrams != null) ...[
+                    SizedBox(height: 4),
+                    Text(
+                      '${meal.proteinGrams!.round()} g protein',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ],
               ),
               PopupMenuButton<_MealAction>(
                 onSelected: (action) {

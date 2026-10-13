@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import 'package:lean_streak/models/meal.dart';
+import 'package:lean_streak/providers/ai_usage_provider.dart';
 import 'package:lean_streak/providers/auth_provider.dart';
 import 'package:lean_streak/providers/daily_summary_provider.dart';
 import 'package:lean_streak/providers/meal_provider.dart';
@@ -14,6 +15,7 @@ class LogMealController extends AsyncNotifier<void> {
     Meal? existingMeal,
     String? name,
     required double calories,
+    double? proteinGrams,
     required List<MealTag> tags,
     String? note,
   }) async {
@@ -26,13 +28,23 @@ class LogMealController extends AsyncNotifier<void> {
       final now = DateTime.now();
       final date = existingMeal?.date ?? DateFormat('yyyy-MM-dd').format(now);
       final docRef = existingMeal == null ? repo.newMealRef(uid) : null;
+      final mealName = (name?.trim().isEmpty ?? true) ? null : name!.trim();
+
+      // Only named meals get an AI protein estimate; calorie-only entries
+      // stay uncounted.
+      final protein =
+          proteinGrams ??
+          (mealName == null
+              ? null
+              : await _estimateProtein(mealName, calories));
 
       final meal = Meal(
         id: existingMeal?.id ?? docRef!.id,
         date: date,
         timestamp: existingMeal?.timestamp ?? now,
-        name: (name?.trim().isEmpty ?? true) ? null : name!.trim(),
+        name: mealName,
         calories: calories,
+        proteinGrams: protein,
         tags: tags,
         note: (note?.trim().isEmpty ?? true) ? null : note!.trim(),
         createdAt: existingMeal?.createdAt ?? now,
@@ -48,6 +60,18 @@ class LogMealController extends AsyncNotifier<void> {
       await ref.read(dailySummaryServiceProvider).recomputeForDate(uid, date);
       ref.invalidate(dailySummaryRepositoryProvider);
     });
+  }
+
+  Future<double?> _estimateProtein(String name, double calories) async {
+    try {
+      final grams = await ref
+          .read(calorieEstimateServiceProvider)
+          .estimateProtein(name, calories.round());
+      return grams?.toDouble();
+    } catch (_) {
+      // Protein is optional; never block saving the meal.
+      return null;
+    }
   }
 
   Future<void> delete(Meal meal) async {

@@ -19,6 +19,7 @@ Future<bool?> showLogMealSheet(
   Meal? existingMeal,
   String? initialName,
   int? initialCalories,
+  int? initialProtein,
 }) {
   return showModalBottomSheet<bool>(
     context: context,
@@ -29,6 +30,7 @@ Future<bool?> showLogMealSheet(
       existingMeal: existingMeal,
       initialName: initialName,
       initialCalories: initialCalories,
+      initialProtein: initialProtein,
     ),
   );
 }
@@ -40,11 +42,13 @@ class _LogMealSheet extends ConsumerStatefulWidget {
     this.existingMeal,
     this.initialName,
     this.initialCalories,
+    this.initialProtein,
   });
 
   final Meal? existingMeal;
   final String? initialName;
   final int? initialCalories;
+  final int? initialProtein;
 
   @override
   ConsumerState<_LogMealSheet> createState() => _LogMealSheetState();
@@ -53,6 +57,7 @@ class _LogMealSheet extends ConsumerStatefulWidget {
 class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
   final _nameController = TextEditingController();
   final _caloriesController = TextEditingController();
+  final _proteinController = TextEditingController();
   final _noteController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _speechToText = SpeechToText();
@@ -84,12 +89,18 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
     if (widget.initialCalories != null) {
       _caloriesController.text = widget.initialCalories.toString();
     }
+    if (widget.initialProtein != null) {
+      _proteinController.text = widget.initialProtein.toString();
+    }
 
     final meal = widget.existingMeal;
     if (meal == null) return;
 
     _nameController.text = meal.name ?? '';
     _caloriesController.text = meal.calories.round().toString();
+    if (meal.proteinGrams != null) {
+      _proteinController.text = meal.proteinGrams!.round().toString();
+    }
     _selectedTags.addAll(meal.tags.where((tag) => tag.isSelectable));
     _noteController.text = meal.note ?? '';
   }
@@ -99,6 +110,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
     _speechToText.cancel();
     _nameController.dispose();
     _caloriesController.dispose();
+    _proteinController.dispose();
     _noteController.dispose();
     _descriptionController.dispose();
     super.dispose();
@@ -125,6 +137,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
           existingMeal: widget.existingMeal,
           name: _nameController.text,
           calories: calories!,
+          proteinGrams: double.tryParse(_proteinController.text.trim()),
           tags: _selectedTags.toList(),
           note: _noteController.text,
         );
@@ -188,6 +201,9 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
     if (_estimate == null) return;
 
     _caloriesController.text = _estimate!.kcal.toString();
+    if (_estimate!.protein != null) {
+      _proteinController.text = _estimate!.protein.toString();
+    }
     setState(() {
       _estimate = null;
       _estimateError = null;
@@ -250,6 +266,9 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
     if (_voiceParsed == null) return;
     _nameController.text = _voiceParsed!.name;
     _caloriesController.text = _voiceParsed!.kcal.toString();
+    if (_voiceParsed!.protein != null) {
+      _proteinController.text = _voiceParsed!.protein.toString();
+    }
     setState(() {
       _voiceParsed = null;
       _voiceRecognizedText = '';
@@ -503,6 +522,42 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
                     ),
                     decoration: InputDecoration(
                       hintText: 'e.g. Salmon, chicken salad, protein shake',
+                      hintStyle: TextStyle(
+                        color: AppColors.textDisabled,
+                        fontSize: 14,
+                      ),
+                      filled: true,
+                      fillColor: AppColors.surfaceVariant,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: AppColors.primary,
+                          width: 2,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 14,
+                        horizontal: 16,
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 24),
+                  const _SectionLabel('PROTEIN (G, OPTIONAL)'),
+                  SizedBox(height: 10),
+                  TextField(
+                    controller: _proteinController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: AppColors.textPrimary,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Leave blank to estimate from the meal name',
                       hintStyle: TextStyle(
                         color: AppColors.textDisabled,
                         fontSize: 14,

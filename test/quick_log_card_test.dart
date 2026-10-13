@@ -9,17 +9,18 @@ import 'package:lean_streak/screens/dashboard/helpers/quick_log_card.dart';
 import 'package:lean_streak/services/calorie_estimate_service.dart';
 
 class _FakeLogMealController extends LogMealController {
-  final saved = <({String? name, double calories})>[];
+  final saved = <({String? name, double calories, double? protein})>[];
 
   @override
   Future<void> submit({
     Meal? existingMeal,
     String? name,
     required double calories,
+    double? proteinGrams,
     required List<MealTag> tags,
     String? note,
   }) async {
-    saved.add((name: name, calories: calories));
+    saved.add((name: name, calories: calories, protein: proteinGrams));
   }
 }
 
@@ -29,13 +30,15 @@ class _FakeEstimateService implements CalorieEstimateService {
   @override
   Future<CalorieEstimate> estimate(String uid, String description) async {
     estimateCalls++;
-    return (kcal: 520, note: 'Typical wrap.');
+    return (kcal: 520, protein: 32, note: 'Typical wrap.');
   }
 
   @override
   Future<VoiceMealParsed> parseVoice(String transcript) async =>
-      (name: 'Lunch', kcal: 400);
+      (name: 'Lunch', kcal: 400, protein: null);
 
+  @override
+  Future<int?> estimateProtein(String name, int kcal) async => 30;
 }
 
 void main() {
@@ -71,7 +74,10 @@ void main() {
     await tester.tap(find.text('Save'));
     await tester.pump();
 
-    expect(controller.saved, [(name: 'Chicken wrap', calories: 450.0)]);
+    // Protein for typed meals is filled in by the controller, not the box.
+    expect(controller.saved, [
+      (name: 'Chicken wrap', calories: 450.0, protein: null),
+    ]);
     expect(estimateService.estimateCalls, 0);
     expect(boxText(tester), isEmpty);
   });
@@ -87,8 +93,8 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(boxText(tester), 'chicken wrap 520 kcal');
-    expect(find.text('Chicken wrap · 520 kcal'), findsOneWidget);
+    expect(boxText(tester), 'chicken wrap 520 kcal 32g protein');
+    expect(find.text('Chicken wrap · 520 kcal · 32 g protein'), findsOneWidget);
     expect(find.text('Typical wrap.'), findsOneWidget);
     expect(find.text('Save'), findsOneWidget);
     expect(controller.saved, isEmpty);
@@ -100,6 +106,25 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pump();
 
-    expect(controller.saved, [(name: 'Porridge', calories: 450.0)]);
+    expect(controller.saved, [
+      (name: 'Porridge', calories: 450.0, protein: null),
+    ]);
+  });
+
+  testWidgets('saves protein typed into the box', (tester) async {
+    await pumpCard(tester);
+    await tester.enterText(
+      find.byType(TextField),
+      'chicken wrap 450 35g protein',
+    );
+    await tester.pump();
+
+    expect(find.text('Chicken wrap · 450 kcal · 35 g protein'), findsOneWidget);
+    await tester.tap(find.text('Save'));
+    await tester.pump();
+
+    expect(controller.saved, [
+      (name: 'Chicken wrap', calories: 450.0, protein: 35.0),
+    ]);
   });
 }

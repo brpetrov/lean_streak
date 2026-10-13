@@ -65,6 +65,21 @@ class HealthCalculator {
     return tdee;
   }
 
+  /// Daily protein target in grams, per kg of goal weight. Goal weight rather
+  /// than current weight so a higher starting body fat doesn't inflate it.
+  static int proteinTargetGrams({
+    required double targetWeightKg,
+    required TrainingFrequency trainingFrequency,
+  }) {
+    final gramsPerKg = switch (trainingFrequency) {
+      TrainingFrequency.none => 1.2,
+      TrainingFrequency.oneToTwo => 1.6,
+      TrainingFrequency.threeToFour => 1.8,
+      TrainingFrequency.fivePlus => 2.0,
+    };
+    return (targetWeightKg * gramsPerKg).round();
+  }
+
   /// Converts the user's chosen weight-loss pace to kg/week.
   static double goalPaceFromWeightLossPace(WeightLossPace pace) {
     return switch (pace) {

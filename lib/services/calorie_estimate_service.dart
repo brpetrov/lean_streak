@@ -8,8 +8,8 @@ import 'package:intl/intl.dart';
 import 'package:lean_streak/core/config/api_keys.dart';
 import 'package:lean_streak/repositories/ai_usage_repository.dart';
 
-typedef CalorieEstimate = ({int kcal, String note});
-typedef VoiceMealParsed = ({String name, int kcal});
+typedef CalorieEstimate = ({int kcal, int? protein, String note});
+typedef VoiceMealParsed = ({String name, int kcal, int? protein});
 
 class DailyLimitExceededException implements Exception {
   const DailyLimitExceededException();
@@ -47,8 +47,7 @@ class CalorieEstimateService {
       '(e.g. musaka is the Bulgarian potato and minced meat bake).\n';
 
   // Listing each component before the total stops the model skipping the
-  // oil, butter or gravy. Protein is requested because that is the wording
-  // that was evaluated; the app only reads the calorie total for now.
+  // oil, butter or gravy.
   static const String _promptTemplate =
       '$_context'
       'The user will describe a meal. List every component with its calories '
@@ -84,6 +83,16 @@ class CalorieEstimateService {
       'Do not include any other text.\n\n'
       'Transcript: {input}';
 
+  static const String _proteinPromptTemplate =
+      '$_context'
+      'The user logged a meal by name with its calories. Assuming the '
+      'calories are right, estimate how many grams of protein it contains.\n'
+      'If the name gives no clue what the food was (e.g. "Lunch" or "Snack"), '
+      'return null.\n'
+      'Respond with ONLY a JSON object: {"protein_g": <integer or null>}\n'
+      'Do not include any other text.\n\n'
+      'Meal: {name}\nCalories: {kcal}';
+
   Future<CalorieEstimate> estimate(String uid, String description) async {
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final count = await _usageRepo.watchCount(uid, today).first;
@@ -110,10 +119,11 @@ class CalorieEstimateService {
 
       final map = jsonDecode(jsonStr) as Map<String, dynamic>;
       final kcal = (map['kcal'] as num).toInt();
+      final protein = (map['protein_g'] as num?)?.round();
       final note = map['note'] as String;
 
       await _usageRepo.increment(uid, today);
-      return (kcal: kcal, note: note);
+      return (kcal: kcal, protein: protein, note: note);
     } on DailyLimitExceededException {
       rethrow;
     } on CalorieEstimateException {
@@ -146,8 +156,9 @@ class CalorieEstimateService {
       final map = jsonDecode(jsonStr) as Map<String, dynamic>;
       final name = map['name'] as String;
       final kcal = (map['kcal'] as num).toInt();
+      final protein = (map['protein_g'] as num?)?.round();
 
-      return (name: name, kcal: kcal);
+      return (name: name, kcal: kcal, protein: protein);
     } on CalorieEstimateException {
       rethrow;
     } on ServerException catch (error, st) {
@@ -159,6 +170,18 @@ class CalorieEstimateService {
         'Could not process voice input right now.',
       );
     }
+  }
+
+  /// Protein for a meal logged by name and calories, or null when the name
+  /// says nothing about the food (e.g. "Lunch"). Like [parseVoice], this
+  /// doesn't count towards the daily AI limit.
+  Future<int?> estimateProtein(String name, int kcal) async {
+    final prompt = _proteinPromptTemplate
+        .replaceFirst('{name}', name.trim())
+        .replaceFirst('{kcal}', '$kcal');
+    final response = await _generateWithRetries(_model, prompt);
+    final map = jsonDecode(response.text ?? '') as Map<String, dynamic>;
+    return (map['protein_g'] as num?)?.round();
   }
 
   Future<GenerateContentResponse> _generateWithRetries(

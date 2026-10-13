@@ -66,6 +66,7 @@ class Meal {
     required this.timestamp,
     this.name,
     required this.calories,
+    this.proteinGrams,
     required this.tags,
     this.note,
     required this.createdAt,
@@ -77,6 +78,9 @@ class Meal {
   final DateTime timestamp;
   final String? name;
   final double calories;
+
+  /// Null when unknown, e.g. calorie-only entries with no meal name.
+  final double? proteinGrams;
   final List<MealTag> tags;
   final String? note;
   final DateTime createdAt;
@@ -91,6 +95,7 @@ class Meal {
       timestamp: (data['timestamp'] as Timestamp).toDate(),
       name: data['name'] as String?,
       calories: (data['calories'] as num).toDouble(),
+      proteinGrams: (data['proteinGrams'] as num?)?.toDouble(),
       tags: (data['tags'] as List<dynamic>)
           .map((value) => MealTag.fromString(value as String))
           .toList(),
@@ -107,6 +112,7 @@ class Meal {
       'timestamp': Timestamp.fromDate(timestamp),
       'name': name,
       'calories': calories,
+      'proteinGrams': proteinGrams,
       'tags': tags.map((tag) => tag.value).toList(),
       'note': note,
       'createdAt': Timestamp.fromDate(createdAt),
