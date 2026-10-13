@@ -29,23 +29,58 @@ class CalorieEstimateService {
 
   final AiUsageRepository _usageRepo;
 
-  static const String _modelId = 'gemini-2.5-flash';
+  static const String _modelId = 'gemini-3.5-flash-lite';
   static const int _maxServerRetries = 3;
+  static final _generationConfig = GenerationConfig(
+    responseMimeType: 'application/json',
+  );
 
+  GenerativeModel get _model => GenerativeModel(
+    model: _modelId,
+    apiKey: ApiKeys.gemini,
+    generationConfig: _generationConfig,
+  );
+
+  static const String _context =
+      'You are a nutrition assistant. The user lives in the UK and often eats '
+      'home-cooked Bulgarian food, so read dish names the Bulgarian way '
+      '(e.g. musaka is the Bulgarian potato and minced meat bake).\n';
+
+  // Listing each component before the total stops the model skipping the
+  // oil, butter or gravy. Protein is requested because that is the wording
+  // that was evaluated; the app only reads the calorie total for now.
   static const String _promptTemplate =
-      'You are a nutrition assistant. The user will describe a meal.\n'
-      'Respond with ONLY a JSON object: '
-      '{"kcal": <integer>, "note": "<one short sentence explaining the estimate>"}.\n'
-      'Do not include any other text. '
-      'Be concise and practical, estimate for a typical portion.\n\n'
+      '$_context'
+      'The user will describe a meal. List every component with its calories '
+      'and protein, including cooking oil, butter, gravy, sauces, bread and '
+      'drinks if mentioned. Use any amounts the user gives; otherwise assume a '
+      'typical home portion. For home-cooked dishes, include the oil or fat '
+      'they are usually cooked with. For branded or chain products use UK '
+      'nutrition figures. Then add them up.\n'
+      'Respond with ONLY a JSON object: {"items": [{"item": "<component>", '
+      '"kcal": <integer>, "protein_g": <integer>}], "kcal": <integer total>, '
+      '"protein_g": <integer total>, "note": "<one short sentence explaining '
+      'the estimate>"}\n'
+      'Do not include any other text.\n\n'
       'Meal: {input}';
 
   static const String _voicePromptTemplate =
-      'You are a nutrition assistant. The user spoke a voice note about a meal.\n'
-      'Extract the meal name and calorie count.\n'
-      'If the user stated a calorie amount, use that exact number.\n'
-      'If no calorie amount was mentioned, estimate calories for a typical portion.\n'
-      'Respond with ONLY a JSON object: {"name": "<short meal name>", "kcal": <integer>}.\n'
+      '$_context'
+      'The user spoke a voice note about a meal. Extract a short meal name, '
+      'the total calories and the total protein.\n'
+      'List every component with its calories and protein. If the user stated '
+      'a calorie or protein amount for something, use that exact number for '
+      'it. Otherwise estimate it: use any amounts the user gives, assume a '
+      'typical home portion if none, include the oil or fat home-cooked dishes '
+      'are usually cooked with, and use UK nutrition figures for branded or '
+      'chain products. Then add them up.\n'
+      'If the user gave calories but no protein, still estimate the protein '
+      'from the food. Only if nothing in the note says what the food was '
+      '(e.g. "400 calories for lunch"), set protein_g to null.\n'
+      'Respond with ONLY a JSON object: {"name": "<short meal name>", '
+      '"items": [{"item": "<component>", "kcal": <integer>, "protein_g": '
+      '<integer or null>}], "kcal": <integer total>, "protein_g": <integer '
+      'total or null>}\n'
       'Do not include any other text.\n\n'
       'Transcript: {input}';
 
@@ -57,12 +92,11 @@ class CalorieEstimateService {
     }
 
     try {
-      final model = GenerativeModel(model: _modelId, apiKey: ApiKeys.gemini);
       final prompt = _promptTemplate.replaceFirst(
         '{input}',
         description.trim(),
       );
-      final response = await _generateWithRetries(model, prompt);
+      final response = await _generateWithRetries(_model, prompt);
       final raw = response.text?.trim() ?? '';
 
       if (raw.isEmpty) {
@@ -95,10 +129,9 @@ class CalorieEstimateService {
 
   Future<VoiceMealParsed> parseVoice(String transcript) async {
     try {
-      final model = GenerativeModel(model: _modelId, apiKey: ApiKeys.gemini);
       final prompt =
           _voicePromptTemplate.replaceFirst('{input}', transcript.trim());
-      final response = await _generateWithRetries(model, prompt);
+      final response = await _generateWithRetries(_model, prompt);
       final raw = response.text?.trim() ?? '';
 
       if (raw.isEmpty) {
