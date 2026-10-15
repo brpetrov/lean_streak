@@ -21,10 +21,11 @@ import 'package:lean_streak/providers/review_provider.dart';
 import 'package:lean_streak/providers/user_profile_provider.dart';
 import 'package:lean_streak/providers/weight_entry_provider.dart';
 import 'package:lean_streak/screens/dashboard/helpers/check_in_dialog.dart';
-import 'package:lean_streak/screens/dashboard/helpers/quick_log_card.dart';
+import 'package:lean_streak/screens/dashboard/helpers/quick_log_bar.dart';
 import 'package:lean_streak/screens/meals/log_meal_sheet.dart';
 import 'package:lean_streak/screens/progress/helpers/log_weight_dialog.dart';
 import 'package:lean_streak/services/check_in_service.dart';
+import 'package:lean_streak/widgets/app_card.dart';
 import 'package:lean_streak/widgets/app_frame.dart';
 import 'package:lean_streak/widgets/responsive_page.dart';
 
@@ -137,7 +138,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
 
     return AppFrame(
       title: 'Today',
-      currentTab: AppFrameTab.today,
+      subtitle: DateFormat('EEEE, d MMMM').format(today),
+      bottom: const QuickLogBar(),
       body: profileAsync.when(
         data: (profile) {
           if (profile == null) {
@@ -171,7 +173,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                 profile: profile,
                 meals: meals,
                 summary: summary,
-                onOpenReview: () => context.go(AppRoutes.review),
+                onOpenReview: () => context.push(AppRoutes.review),
                 onEditMeal: (meal) =>
                     showLogMealSheet(context, existingMeal: meal),
                 onDeleteMeal: (meal) async {
@@ -270,7 +272,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   }
 }
 
-class _DashboardContent extends ConsumerWidget {
+class _DashboardContent extends StatelessWidget {
   const _DashboardContent({
     required this.date,
     required this.profile,
@@ -290,8 +292,7 @@ class _DashboardContent extends ConsumerWidget {
   final Future<void> Function(Meal meal) onDeleteMeal;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final bottomPadding = MediaQuery.of(context).padding.bottom + 32;
+  Widget build(BuildContext context) {
     final proteinLogged = meals
         .fold<double>(0, (sum, meal) => sum + (meal.proteinGrams ?? 0))
         .round();
@@ -300,16 +301,12 @@ class _DashboardContent extends ConsumerWidget {
       padding: EdgeInsets.zero,
       children: [
         ResponsivePage(
-          maxWidth: 760,
-          padding: EdgeInsets.fromLTRB(20, 20, 20, bottomPadding),
+          maxWidth: 720,
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _HeaderSection(date: date, name: profile.name),
-              SizedBox(height: 20),
-              const QuickLogCard(),
-              SizedBox(height: 16),
-              _CalorieOverviewCard(
+              _TodayCard(
                 summary: summary,
                 proteinLogged: proteinLogged,
                 proteinTarget: HealthCalculator.proteinTargetGrams(
@@ -320,39 +317,15 @@ class _DashboardContent extends ConsumerWidget {
                     .where((meal) => meal.proteinGrams == null)
                     .length,
               ),
-              SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Today\'s Meals',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    '${meals.length} logged',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 12),
+              _MealsCard(
+                meals: meals,
+                onEditMeal: onEditMeal,
+                onDeleteMeal: onDeleteMeal,
               ),
-              SizedBox(height: 12),
-              if (meals.isEmpty)
-                const _EmptyMealsState()
-              else
-                ..._buildMealCards(meals),
-              SizedBox(height: 24),
+              const SizedBox(height: 12),
               _MonthPreviewCard(date: date, onOpenReview: onOpenReview),
-              SizedBox(height: 16),
-              _StatusCard(summary: summary),
-              SizedBox(height: 16),
+              const SizedBox(height: 12),
               const _WeightCard(),
             ],
           ),
@@ -360,62 +333,11 @@ class _DashboardContent extends ConsumerWidget {
       ],
     );
   }
-
-  List<Widget> _buildMealCards(List<Meal> meals) {
-    final widgets = <Widget>[];
-    for (var index = 0; index < meals.length; index++) {
-      widgets.add(
-        _MealCard(
-          meal: meals[index],
-          onEdit: () => onEditMeal(meals[index]),
-          onDelete: () => onDeleteMeal(meals[index]),
-        ),
-      );
-      if (index < meals.length - 1) {
-        widgets.add(SizedBox(height: 12));
-      }
-    }
-    return widgets;
-  }
 }
 
-class _HeaderSection extends StatelessWidget {
-  const _HeaderSection({required this.date, required this.name});
-
-  final DateTime date;
-  final String name;
-
-  @override
-  Widget build(BuildContext context) {
-    final firstName = name.trim().split(' ').first;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          DateFormat('EEEE, d MMMM').format(date),
-          style: TextStyle(
-            fontSize: 14,
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        SizedBox(height: 8),
-        Text(
-          'Hi, $firstName',
-          style: TextStyle(
-            fontSize: 30,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _CalorieOverviewCard extends StatelessWidget {
-  const _CalorieOverviewCard({
+/// Calories left for the day, then daily protein, in one card.
+class _TodayCard extends StatelessWidget {
+  const _TodayCard({
     required this.summary,
     required this.proteinLogged,
     required this.proteinTarget,
@@ -429,72 +351,69 @@ class _CalorieOverviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final remainingCalories = summary.targetCalories - summary.totalCalories;
-    final remainingLabel = remainingCalories >= 0 ? 'Remaining' : 'Over target';
-    final remainingValue = remainingCalories >= 0
-        ? '$remainingCalories kcal'
-        : '${remainingCalories.abs()} kcal';
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 18,
-            offset: Offset(0, 8),
-          ),
-        ],
+    final remaining = summary.targetCalories - summary.totalCalories;
+    final calorieProgress = summary.targetCalories <= 0
+        ? 0.0
+        : summary.totalCalories / summary.targetCalories;
+    // The day isn't over, so being under target isn't flagged; only "on
+    // track" and "over" are worth saying while it is still today.
+    final (String? pillLabel, Color barColor) = switch (summary) {
+      _ when summary.mealCount == 0 => (null, AppColors.primary),
+      _ when summary.status == DailyStatus.green => (
+        'On track',
+        AppColors.veryGood,
       ),
+      _ when summary.calorieDelta > 0 => (
+        'Over target',
+        _statusColor(summary.status),
+      ),
+      _ => (null, AppColors.primary),
+    };
+
+    return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Calories Today',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          SizedBox(height: 4),
-          Text(
-            '${summary.totalCalories} logged against ${summary.targetCalories} kcal target',
-            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-          ),
-          SizedBox(height: 18),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: _MetricBlock(
-                  label: 'Target',
-                  value: '${summary.targetCalories}',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      remaining >= 0
+                          ? '$remaining kcal left'
+                          : '${remaining.abs()} kcal over',
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${summary.totalCalories} of ${summary.targetCalories} kcal eaten',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Expanded(
-                child: _MetricBlock(
-                  label: 'Logged',
-                  value: '${summary.totalCalories}',
-                ),
-              ),
-              Expanded(
-                child: _MetricBlock(
-                  label: remainingLabel,
-                  value: remainingValue,
-                  highlight: remainingCalories >= 0
-                      ? AppColors.primary
-                      : AppColors.error,
-                ),
-              ),
+              if (pillLabel != null)
+                _StatusPill(label: pillLabel, color: barColor),
             ],
           ),
-          SizedBox(height: 18),
+          const SizedBox(height: 14),
+          _ProgressBar(value: calorieProgress, color: barColor),
+          const SizedBox(height: 20),
           Row(
             children: [
-              Text(
-                'Protein',
+              const Text(
+                'Daily protein',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -504,7 +423,7 @@ class _CalorieOverviewCard extends StatelessWidget {
               const Spacer(),
               Text(
                 '$proteinLogged / $proteinTarget g',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
@@ -512,24 +431,20 @@ class _CalorieOverviewCard extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: proteinTarget <= 0
-                  ? 0
-                  : (proteinLogged / proteinTarget).clamp(0.0, 1.0),
-              minHeight: 8,
-              color: AppColors.primary,
-              backgroundColor: AppColors.surfaceVariant,
-            ),
+          const SizedBox(height: 8),
+          _ProgressBar(
+            value: proteinTarget <= 0 ? 0 : proteinLogged / proteinTarget,
+            color: AppColors.primary,
           ),
           if (mealsWithoutProtein > 0) ...[
-            SizedBox(height: 6),
+            const SizedBox(height: 6),
             Text(
               '$mealsWithoutProtein ${mealsWithoutProtein == 1 ? 'meal' : 'meals'} '
               'not counted (no protein info)',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ],
@@ -537,6 +452,208 @@ class _CalorieOverviewCard extends StatelessWidget {
     );
   }
 }
+
+class _ProgressBar extends StatelessWidget {
+  const _ProgressBar({required this.value, required this.color});
+
+  final double value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: LinearProgressIndicator(
+        value: value.clamp(0.0, 1.0),
+        minHeight: 8,
+        color: color,
+        backgroundColor: AppColors.surfaceVariant,
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+}
+
+/// Today's meals as plain rows in one card.
+class _MealsCard extends StatelessWidget {
+  const _MealsCard({
+    required this.meals,
+    required this.onEditMeal,
+    required this.onDeleteMeal,
+  });
+
+  final List<Meal> meals;
+  final ValueChanged<Meal> onEditMeal;
+  final Future<void> Function(Meal meal) onDeleteMeal;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(18, 16, 6, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12, bottom: 4),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Today\'s meals',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                if (meals.isNotEmpty)
+                  Text(
+                    '${meals.length} logged',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (meals.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 4, bottom: 10, right: 12),
+              child: Text(
+                'Nothing logged yet. Type or tap the mic below.',
+                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              ),
+            )
+          else
+            for (var index = 0; index < meals.length; index++) ...[
+              if (index > 0) const Divider(height: 1),
+              _MealRow(
+                meal: meals[index],
+                onEdit: () => onEditMeal(meals[index]),
+                onDelete: () => onDeleteMeal(meals[index]),
+              ),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MealRow extends StatelessWidget {
+  const _MealRow({
+    required this.meal,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final Meal meal;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = (meal.name?.trim().isNotEmpty ?? false)
+        ? meal.name!.trim()
+        : 'Unnamed meal';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  DateFormat('HH:mm').format(meal.timestamp),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${meal.calories.round()} kcal',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              if (meal.proteinGrams != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  '${meal.proteinGrams!.round()} g protein',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          PopupMenuButton<_MealAction>(
+            tooltip: 'Meal options',
+            onSelected: (action) {
+              if (action == _MealAction.edit) {
+                onEdit();
+                return;
+              }
+              onDelete();
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: _MealAction.edit, child: Text('Edit')),
+              PopupMenuItem(value: _MealAction.delete, child: Text('Delete')),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _MealAction { edit, delete }
 
 class _MonthPreviewCard extends ConsumerWidget {
   const _MonthPreviewCard({required this.date, required this.onOpenReview});
@@ -551,25 +668,40 @@ class _MonthPreviewCard extends ConsumerWidget {
     final range = ReviewRange(startDate: startOfMonth, endDate: today);
     final summariesAsync = ref.watch(reviewSummariesProvider(range));
 
-    return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: onOpenReview,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.shadow,
-                blurRadius: 18,
-                offset: Offset(0, 8),
+    return AppCard(
+      onTap: onOpenReview,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  DateFormat('MMMM').format(date),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              const Text(
+                'Review',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: AppColors.primary,
               ),
             ],
           ),
-          child: summariesAsync.when(
+          const SizedBox(height: 14),
+          summariesAsync.when(
             data: (summariesByDate) {
               final days = List.generate(
                 today.day,
@@ -582,82 +714,45 @@ class _MonthPreviewCard extends ConsumerWidget {
                   )
                   .whereType<DailySummary>()
                   .toList();
-              final greenDays = summaries
-                  .where((summary) => summary.status == DailyStatus.green)
-                  .length;
-              final yellowDays = summaries
-                  .where((summary) => summary.status == DailyStatus.yellow)
-                  .length;
-              final redDays = summaries
-                  .where((summary) => summary.status == DailyStatus.red)
-                  .length;
+              int count(DailyStatus status) =>
+                  summaries.where((summary) => summary.status == status).length;
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Month Preview',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              '${DateFormat('MMMM').format(date)} so far',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      TextButton(onPressed: onOpenReview, child: Text('Open')),
-                    ],
-                  ),
-                  SizedBox(height: 16),
                   SizedBox(
-                    height: 96,
+                    height: 80,
                     child: _MonthPreviewBars(
                       days: days,
                       summariesByDate: summariesByDate,
                     ),
                   ),
-                  SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
                         child: Text(
                           summaries.isEmpty
                               ? 'No logged days yet this month.'
-                              : '${summaries.length} logged days this month.',
-                          style: TextStyle(
-                            fontSize: 14,
+                              : '${summaries.length} days logged',
+                          style: const TextStyle(
+                            fontSize: 13,
                             color: AppColors.textSecondary,
                           ),
                         ),
                       ),
-                      SizedBox(width: 12),
                       _MiniStatusChip(
-                        label: '$greenDays',
+                        label: '${count(DailyStatus.green)}',
                         color: AppColors.veryGood,
                       ),
-                      SizedBox(width: 6),
+                      const SizedBox(width: 6),
                       _MiniStatusChip(
-                        label: '$yellowDays',
+                        label: '${count(DailyStatus.yellow)}',
                         color: AppColors.bad,
                       ),
-                      SizedBox(width: 6),
+                      const SizedBox(width: 6),
                       _MiniStatusChip(
-                        label: '$redDays',
+                        label: '${count(DailyStatus.red)}',
                         color: AppColors.veryBad,
                       ),
                     ],
@@ -665,23 +760,23 @@ class _MonthPreviewCard extends ConsumerWidget {
                 ],
               );
             },
-            loading: () => SizedBox(
-              height: 148,
+            loading: () => const SizedBox(
+              height: 112,
               child: Center(
                 child: CircularProgressIndicator(color: AppColors.primary),
               ),
             ),
-            error: (_, _) => SizedBox(
-              height: 148,
+            error: (_, _) => const SizedBox(
+              height: 112,
               child: Center(
                 child: Text(
-                  'Could not load month preview.',
+                  'Could not load this month.',
                   style: TextStyle(color: AppColors.textSecondary),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -787,86 +882,14 @@ class _MiniStatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.w700,
-          fontSize: 12,
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({required this.summary});
-
-  final DailySummary summary;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _statusColor(summary.status);
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 18,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Today\'s Status',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  summary.status.label,
-                  style: TextStyle(color: color, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 14),
-          Text(
-            _statusMessage(summary),
-            style: TextStyle(
-              fontSize: 15,
-              color: AppColors.textSecondary,
-              height: 1.4,
-            ),
-          ),
-        ],
+        style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 12),
       ),
     );
   }
@@ -877,299 +900,59 @@ class _WeightCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final entriesAsync = ref.watch(weightEntriesProvider);
-    final entries = entriesAsync.valueOrNull ?? const [];
+    final entries = ref.watch(weightEntriesProvider).valueOrNull ?? const [];
     final latest = entries.isNotEmpty ? entries.last.weightKg : null;
 
-    return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: () => context.push(AppRoutes.progress),
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.shadow,
-                blurRadius: 18,
-                offset: Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.monitor_weight_outlined, color: AppColors.primary),
-              SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Weight',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      latest != null
-                          ? 'Latest: ${latest.toStringAsFixed(1)} kg'
-                          : 'Log your weight to track progress',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
+    return AppCard(
+      onTap: () => context.push(AppRoutes.progress),
+      padding: const EdgeInsets.fromLTRB(18, 10, 10, 10),
+      child: Row(
+        children: [
+          const Icon(Icons.monitor_weight_outlined, color: AppColors.primary),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Weight',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
-              ),
-              TextButton(
-                onPressed: () async {
-                  final result = await showLogWeightDialog(context);
-                  if (!context.mounted || result == null) return;
-                  final message = result.targetChanged
-                      ? 'Weight saved. New target: ${result.newCalorieTarget} kcal.'
-                      : 'Weight saved.';
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text(message)));
-                },
-                child: Text('Log'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MetricBlock extends StatelessWidget {
-  const _MetricBlock({
-    required this.label,
-    required this.value,
-    this.highlight,
-  });
-
-  final String label;
-  final String value;
-  final Color? highlight;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-          ),
-          SizedBox(height: 6),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: highlight ?? AppColors.textPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EmptyMealsState extends StatelessWidget {
-  const _EmptyMealsState();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'No meals logged yet',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Add your first meal to see calories and day status update automatically.',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-              height: 1.4,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MealCard extends StatelessWidget {
-  const _MealCard({
-    required this.meal,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  final Meal meal;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final time = DateFormat('HH:mm').format(meal.timestamp);
-    final mealName = (meal.name?.trim().isNotEmpty ?? false)
-        ? meal.name!.trim()
-        : 'Unnamed meal';
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      mealName,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      time,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 2),
+                Text(
+                  latest != null
+                      ? 'Latest: ${latest.toStringAsFixed(1)} kg'
+                      : 'Log your weight to track progress',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '${meal.calories.round()} kcal',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  if (meal.proteinGrams != null) ...[
-                    SizedBox(height: 4),
-                    Text(
-                      '${meal.proteinGrams!.round()} g protein',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              PopupMenuButton<_MealAction>(
-                onSelected: (action) {
-                  if (action == _MealAction.edit) {
-                    onEdit();
-                    return;
-                  }
-                  onDelete();
-                },
-                itemBuilder: (context) => [
-                  PopupMenuItem(value: _MealAction.edit, child: Text('Edit')),
-                  PopupMenuItem(
-                    value: _MealAction.delete,
-                    child: Text('Delete'),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
-          if (meal.tags.isNotEmpty) ...[
-            SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: meal.tags.map((tag) {
-                final color = tag.isPositive
-                    ? AppColors.tagPositive
-                    : tag.isNeutral
-                    ? AppColors.tagNeutral
-                    : AppColors.tagWarning;
-                final background = tag.isPositive
-                    ? AppColors.tagPositiveBg
-                    : tag.isNeutral
-                    ? AppColors.tagNeutralBg
-                    : AppColors.tagWarningBg;
-
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: background,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    tag.label,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: color,
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ],
-          if (meal.note != null) ...[
-            SizedBox(height: 12),
-            Text(
-              meal.note!,
-              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-            ),
-          ],
+          TextButton(
+            onPressed: () async {
+              final result = await showLogWeightDialog(context);
+              if (!context.mounted || result == null) return;
+              final message = result.targetChanged
+                  ? 'Weight saved. New target: ${result.newCalorieTarget} kcal.'
+                  : 'Weight saved.';
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(message)));
+            },
+            child: const Text('Log'),
+          ),
         ],
       ),
     );
   }
 }
-
-enum _MealAction { edit, delete }
 
 Color _statusColor(DailyStatus status) {
   return switch (status) {
@@ -1177,21 +960,4 @@ Color _statusColor(DailyStatus status) {
     DailyStatus.yellow => AppColors.bad,
     DailyStatus.red => AppColors.veryBad,
   };
-}
-
-String _statusMessage(DailySummary summary) {
-  if (summary.mealCount == 0) {
-    return 'No meals logged yet.';
-  }
-  if (summary.status == DailyStatus.green) {
-    return 'You stayed within 10% of your calorie target today.';
-  }
-  if (summary.status == DailyStatus.yellow) {
-    return summary.calorieDelta > 0
-        ? 'You finished 10% to 20% above target today.'
-        : 'You finished 10% to 20% below target today.';
-  }
-  return summary.calorieDelta > 0
-      ? 'You finished more than 20% above target today.'
-      : 'You finished more than 20% below target today.';
 }

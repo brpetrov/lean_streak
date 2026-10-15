@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:speech_to_text/speech_recognition_error.dart';
@@ -11,16 +12,17 @@ import 'package:lean_streak/providers/log_meal_controller.dart';
 import 'package:lean_streak/screens/meals/log_meal_sheet.dart';
 import 'package:lean_streak/services/calorie_estimate_service.dart';
 
-/// The landing input on Today. "chicken wrap 450" saves straight away; a meal
-/// without calories can be estimated by the AI, and the mic fills the box.
-class QuickLogCard extends ConsumerStatefulWidget {
-  const QuickLogCard({super.key});
+/// The log composer pinned to the bottom of Today, under the thumb.
+/// "chicken wrap 450" saves straight away; a meal without calories can be
+/// estimated by the AI. With the box empty the main button is the mic.
+class QuickLogBar extends ConsumerStatefulWidget {
+  const QuickLogBar({super.key});
 
   @override
-  ConsumerState<QuickLogCard> createState() => _QuickLogCardState();
+  ConsumerState<QuickLogBar> createState() => _QuickLogBarState();
 }
 
-class _QuickLogCardState extends ConsumerState<QuickLogCard> {
+class _QuickLogBarState extends ConsumerState<QuickLogBar> {
   final _controller = TextEditingController();
   final _speechToText = SpeechToText();
 
@@ -32,6 +34,15 @@ class _QuickLogCardState extends ConsumerState<QuickLogCard> {
   String? _error;
 
   QuickLogEntry get _entry => parseQuickLog(_controller.text);
+
+  // Touch devices choose between typing and the mic, so only desktop
+  // (including desktop browsers, which have no on-screen keyboard) focuses
+  // the box on open.
+  bool get _isDesktop => switch (defaultTargetPlatform) {
+    TargetPlatform.windows || TargetPlatform.macOS || TargetPlatform.linux =>
+      true,
+    _ => false,
+  };
 
   @override
   void dispose() {
@@ -211,109 +222,109 @@ class _QuickLogCardState extends ConsumerState<QuickLogCard> {
   Widget build(BuildContext context) {
     final entry = _entry;
     final hasText = _controller.text.trim().isNotEmpty;
-    final busy = _working || _listening;
+    final showStatus = hasText || _listening || _working || _error != null;
 
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 18,
-            offset: Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'What did you eat?',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+    return Material(
+      color: AppColors.surface,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: AppColors.divider)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (showStatus) ...[
+                      _buildStatus(entry, hasText),
+                      const SizedBox(height: 8),
+                    ],
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _controller,
+                            autofocus: _isDesktop,
+                            readOnly: _working || _listening,
+                            textCapitalization: TextCapitalization.sentences,
+                            textInputAction: TextInputAction.done,
+                            onChanged: (_) => setState(() {
+                              _aiNote = null;
+                              _error = null;
+                            }),
+                            onSubmitted: (_) => _submit(),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: AppColors.textPrimary,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'What did you eat? e.g. wrap 450',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(26),
+                                borderSide: BorderSide.none,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(26),
+                                borderSide: BorderSide.none,
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(26),
+                                borderSide: const BorderSide(
+                                  color: AppColors.primary,
+                                  width: 1.5,
+                                ),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                vertical: 15,
+                                horizontal: 20,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildAction(entry, hasText),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-          SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  autofocus: true,
-                  readOnly: busy,
-                  textCapitalization: TextCapitalization.sentences,
-                  textInputAction: TextInputAction.done,
-                  onChanged: (_) => setState(() {
-                    _aiNote = null;
-                    _error = null;
-                  }),
-                  onSubmitted: (_) => _submit(),
-                  style: TextStyle(fontSize: 16, color: AppColors.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: 'e.g. chicken wrap 450',
-                    hintStyle: TextStyle(
-                      color: AppColors.textDisabled,
-                      fontSize: 15,
-                    ),
-                    filled: true,
-                    fillColor: AppColors.surfaceVariant,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: AppColors.primary,
-                        width: 2,
-                      ),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      vertical: 14,
-                      horizontal: 16,
-                    ),
-                  ),
-                ),
-              ),
-              SizedBox(width: 8),
-              IconButton.filledTonal(
-                onPressed: _working ? null : _toggleListening,
-                tooltip: _listening ? 'Stop' : 'Speak',
-                icon: Icon(_listening ? Icons.stop_rounded : Icons.mic_rounded),
-              ),
-            ],
-          ),
-          SizedBox(height: 10),
-          _buildStatus(entry, hasText),
-          SizedBox(height: 8),
-          Row(
-            children: [
-              TextButton(
-                onPressed: busy ? null : _openDetails,
-                child: Text('More details'),
-              ),
-              const Spacer(),
-              FilledButton.icon(
-                onPressed: busy || !hasText ? null : _submit,
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                ),
-                icon: Icon(
-                  entry.kcal != null
-                      ? Icons.check_rounded
-                      : Icons.auto_awesome_rounded,
-                  size: 18,
-                ),
-                label: Text(entry.kcal != null ? 'Save' : 'Estimate'),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
+    );
+  }
+
+  /// One thumb-sized button that changes with the box: mic when empty,
+  /// save or estimate once there is text, stop while listening.
+  Widget _buildAction(QuickLogEntry entry, bool hasText) {
+    final (IconData icon, String tooltip, VoidCallback? onPressed) =
+        _listening
+        ? (Icons.stop_rounded, 'Stop', _toggleListening)
+        : _working
+        ? (Icons.more_horiz_rounded, 'Working', null)
+        : !hasText
+        ? (Icons.mic_rounded, 'Speak', _toggleListening)
+        : entry.kcal != null
+        ? (Icons.check_rounded, 'Save', _submit)
+        : (Icons.auto_awesome_rounded, 'Estimate with AI', _submit);
+
+    return IconButton.filled(
+      onPressed: onPressed,
+      tooltip: tooltip,
+      iconSize: 26,
+      style: IconButton.styleFrom(
+        minimumSize: const Size(52, 52),
+        backgroundColor: _listening ? AppColors.veryBad : AppColors.primary,
+        foregroundColor: AppColors.onPrimary,
+      ),
+      icon: Icon(icon),
     );
   }
 
@@ -326,13 +337,8 @@ class _QuickLogCardState extends ConsumerState<QuickLogCard> {
       ),
       _ when _working => ('Working...', AppColors.textSecondary, false),
       _ when _error != null => (_error!, AppColors.error, false),
-      _ when !hasText => (
-        'Type a meal and its calories, or tap the mic.',
-        AppColors.textSecondary,
-        false,
-      ),
       (name: final name, kcal: null, protein: _) => (
-        '${name ?? 'Meal'} · no calories yet. Add a number or tap Estimate.',
+        '${name ?? 'Meal'} · no calories yet. Add a number or estimate with AI.',
         AppColors.textSecondary,
         false,
       ),
@@ -347,24 +353,39 @@ class _QuickLogCardState extends ConsumerState<QuickLogCard> {
       ),
     };
 
-    return Column(
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          message,
-          style: TextStyle(
-            fontSize: 14,
-            color: color,
-            fontWeight: emphasise ? FontWeight.w600 : FontWeight.w400,
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(left: 4, top: 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: color,
+                    fontWeight: emphasise ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+                if (_aiNote != null && !_working) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    _aiNote!,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
-        if (_aiNote != null && !_working) ...[
-          SizedBox(height: 4),
-          Text(
-            _aiNote!,
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-          ),
-        ],
+        if (hasText && !_working && !_listening)
+          TextButton(onPressed: _openDetails, child: const Text('More details')),
       ],
     );
   }

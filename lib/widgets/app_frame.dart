@@ -9,23 +9,21 @@ import 'package:lean_streak/providers/auth_controller.dart';
 import 'package:lean_streak/widgets/app_logo_mark.dart';
 import 'package:lean_streak/widgets/password_confirm_dialog.dart';
 
-enum AppFrameTab { today, review, summary }
-
+/// The home shell: app bar with the menu, the page body, and an optional bar
+/// pinned to the bottom (kept above the keyboard).
 class AppFrame extends ConsumerWidget {
   const AppFrame({
     super.key,
     required this.title,
-    required this.currentTab,
+    this.subtitle,
     required this.body,
-    this.floatingActionButton,
-    this.actions,
+    this.bottom,
   });
 
   final String title;
-  final AppFrameTab currentTab;
+  final String? subtitle;
   final Widget body;
-  final Widget? floatingActionButton;
-  final List<Widget>? actions;
+  final Widget? bottom;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -34,46 +32,36 @@ class AppFrame extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text(title), actions: actions),
-      drawer: _AppDrawer(authState: authState, accountState: accountState),
-      body: body,
-      floatingActionButton: floatingActionButton,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: currentTab.index,
-        onDestinationSelected: (index) =>
-            _handleTabSelection(context, AppFrameTab.values[index]),
-        destinations: [
-          NavigationDestination(
-            icon: Icon(Icons.today_outlined),
-            selectedIcon: Icon(Icons.today_rounded),
-            label: 'Today',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.calendar_month_outlined),
-            selectedIcon: Icon(Icons.calendar_month_rounded),
-            label: 'Review',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.insights_outlined),
-            selectedIcon: Icon(Icons.insights_rounded),
-            label: 'Summary',
-          ),
-        ],
+      appBar: AppBar(
+        title: subtitle == null
+            ? Text(title)
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title),
+                  Text(
+                    subtitle!,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
       ),
+      drawer: _AppDrawer(authState: authState, accountState: accountState),
+      // The bottom bar lives in the body so it rides above the keyboard;
+      // Scaffold.bottomNavigationBar would stay hidden behind it.
+      body: bottom == null
+          ? body
+          : Column(
+              children: [
+                Expanded(child: body),
+                bottom!,
+              ],
+            ),
     );
-  }
-
-  void _handleTabSelection(BuildContext context, AppFrameTab tab) {
-    if (tab == currentTab) return;
-
-    switch (tab) {
-      case AppFrameTab.today:
-        context.go(AppRoutes.dashboard);
-      case AppFrameTab.review:
-        context.go(AppRoutes.review);
-      case AppFrameTab.summary:
-        context.go(AppRoutes.summary);
-    }
   }
 }
 
@@ -111,6 +99,22 @@ class _AppDrawer extends ConsumerWidget {
             ),
             Divider(height: 1),
             ListTile(
+              leading: Icon(Icons.calendar_month_outlined),
+              title: Text('Review'),
+              onTap: () {
+                Navigator.of(context).pop();
+                context.push(AppRoutes.review);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.insights_outlined),
+              title: Text('Summary'),
+              onTap: () {
+                Navigator.of(context).pop();
+                context.push(AppRoutes.summary);
+              },
+            ),
+            ListTile(
               leading: Icon(Icons.monitor_weight_outlined),
               title: Text('Weight & Progress'),
               onTap: () {
@@ -133,11 +137,6 @@ class _AppDrawer extends ConsumerWidget {
                 Navigator.of(context).pop();
                 context.push(AppRoutes.profile);
               },
-            ),
-            const ListTile(
-              enabled: false,
-              leading: Icon(Icons.star_outline_rounded),
-              title: Text('Rate this app'),
             ),
             const Spacer(),
             Divider(height: 1),

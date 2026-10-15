@@ -1,6 +1,9 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lean_streak/app/router.dart';
+import 'package:lean_streak/core/constants/app_colors.dart';
 import 'package:lean_streak/core/theme/app_theme.dart';
 import 'package:lean_streak/providers/activity_scale_migration_provider.dart';
 
@@ -16,18 +19,41 @@ class LeanStreakApp extends ConsumerWidget {
       theme: AppTheme.light,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
-      builder: (context, child) {
-        // Floating snackbars otherwise stretch across wide browser windows.
-        // A fixed theme width would overflow phones, so apply it only here.
-        if (MediaQuery.sizeOf(context).width < 600) return child!;
-        final theme = Theme.of(context);
-        return Theme(
-          data: theme.copyWith(
-            snackBarTheme: theme.snackBarTheme.copyWith(width: 480),
-          ),
-          child: child!,
-        );
-      },
+      builder: appShellBuilder,
     );
   }
+}
+
+/// Widest the app gets. Wider browser windows show it as one centred column,
+/// so the app bar, pages, dialogs and the bottom bar all line up.
+const double appMaxWidth = 760;
+
+Widget appShellBuilder(BuildContext context, Widget? child) {
+  final mediaQuery = MediaQuery.of(context);
+  if (mediaQuery.size.width <= appMaxWidth) return child!;
+
+  final theme = Theme.of(context);
+  return ColoredBox(
+    color: AppColors.background,
+    child: Center(
+      child: SizedBox(
+        width: appMaxWidth,
+        child: MediaQuery(
+          data: mediaQuery.copyWith(
+            size: Size(
+              math.min(mediaQuery.size.width, appMaxWidth),
+              mediaQuery.size.height,
+            ),
+          ),
+          child: Theme(
+            // Keep floating snackbars phone-sized inside the column.
+            data: theme.copyWith(
+              snackBarTheme: theme.snackBarTheme.copyWith(width: 480),
+            ),
+            child: child!,
+          ),
+        ),
+      ),
+    ),
+  );
 }

@@ -5,7 +5,7 @@ import 'package:lean_streak/models/meal.dart';
 import 'package:lean_streak/providers/ai_usage_provider.dart';
 import 'package:lean_streak/providers/auth_provider.dart';
 import 'package:lean_streak/providers/log_meal_controller.dart';
-import 'package:lean_streak/screens/dashboard/helpers/quick_log_card.dart';
+import 'package:lean_streak/screens/dashboard/helpers/quick_log_bar.dart';
 import 'package:lean_streak/services/calorie_estimate_service.dart';
 
 class _FakeLogMealController extends LogMealController {
@@ -55,7 +55,7 @@ void main() {
           calorieEstimateServiceProvider.overrideWithValue(estimateService),
           currentUidProvider.overrideWithValue('user-1'),
         ],
-        child: const MaterialApp(home: Scaffold(body: QuickLogCard())),
+        child: const MaterialApp(home: Scaffold(body: QuickLogBar())),
       ),
     );
   }
@@ -71,7 +71,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Chicken wrap · 450 kcal'), findsOneWidget);
-    await tester.tap(find.text('Save'));
+    await tester.tap(find.byTooltip('Save'));
     await tester.pump();
 
     // Protein for typed meals is filled in by the controller, not the box.
@@ -89,14 +89,14 @@ void main() {
     await tester.enterText(find.byType(TextField), 'chicken wrap');
     await tester.pump();
 
-    await tester.tap(find.text('Estimate'));
+    await tester.tap(find.byTooltip('Estimate with AI'));
     await tester.pump();
     await tester.pump();
 
     expect(boxText(tester), 'chicken wrap 520 kcal 32g protein');
     expect(find.text('Chicken wrap · 520 kcal · 32 g protein'), findsOneWidget);
     expect(find.text('Typical wrap.'), findsOneWidget);
-    expect(find.text('Save'), findsOneWidget);
+    expect(find.byTooltip('Save'), findsOneWidget);
     expect(controller.saved, isEmpty);
   });
 
@@ -120,7 +120,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Chicken wrap · 450 kcal · 35 g protein'), findsOneWidget);
-    await tester.tap(find.text('Save'));
+    await tester.tap(find.byTooltip('Save'));
     await tester.pump();
 
     expect(controller.saved, [

@@ -8,7 +8,6 @@ import 'package:lean_streak/models/daily_summary.dart';
 import 'package:lean_streak/models/period_review.dart';
 import 'package:lean_streak/providers/period_review_provider.dart';
 import 'package:lean_streak/providers/review_provider.dart';
-import 'package:lean_streak/widgets/app_frame.dart';
 
 class SummaryScreen extends ConsumerStatefulWidget {
   const SummaryScreen({super.key});
@@ -25,9 +24,9 @@ class _SummaryScreenState extends ConsumerState<SummaryScreen> {
   Widget build(BuildContext context) {
     final periodsAsync = ref.watch(reviewPeriodsProvider);
 
-    return AppFrame(
-      title: 'Summary',
-      currentTab: AppFrameTab.summary,
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(title: const Text('Summary')),
       body: periodsAsync.when(
         data: (periods) {
           final completedPeriods = _mode == _SummaryMode.week

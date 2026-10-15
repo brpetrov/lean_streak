@@ -166,26 +166,6 @@ class AppTheme {
         labelStyle: const TextStyle(color: textSecondary),
         hintStyle: const TextStyle(color: textDisabled),
       ),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: surface,
-        indicatorColor: surfaceVariant,
-        labelTextStyle: WidgetStateProperty.resolveWith((states) {
-          return TextStyle(
-            color: states.contains(WidgetState.selected)
-                ? textPrimary
-                : textSecondary,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          );
-        }),
-        iconTheme: WidgetStateProperty.resolveWith((states) {
-          return IconThemeData(
-            color: states.contains(WidgetState.selected)
-                ? textPrimary
-                : textSecondary,
-          );
-        }),
-      ),
       drawerTheme: const DrawerThemeData(
         backgroundColor: surface,
         surfaceTintColor: Colors.transparent,

@@ -9,7 +9,6 @@ import 'package:lean_streak/providers/daily_summary_provider.dart';
 import 'package:lean_streak/providers/past_day_edit_provider.dart';
 import 'package:lean_streak/providers/review_provider.dart';
 import 'package:lean_streak/repositories/day_edit_repository.dart';
-import 'package:lean_streak/widgets/app_frame.dart';
 import 'package:lean_streak/widgets/responsive_page.dart';
 
 class ReviewScreen extends ConsumerStatefulWidget {
@@ -33,9 +32,9 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
   Widget build(BuildContext context) {
     final periodsAsync = ref.watch(reviewPeriodsProvider);
 
-    return AppFrame(
-      title: 'Review',
-      currentTab: AppFrameTab.review,
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(title: const Text('Review')),
       body: periodsAsync.when(
         data: (periods) {
           final activePeriods = _mode == _ReviewMode.month

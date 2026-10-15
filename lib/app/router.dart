@@ -26,7 +26,6 @@ class AppRoutes {
   static const onboarding = '/onboarding';
   static const profileLoadError = '/profile-load-error';
   static const dashboard = '/dashboard';
-  static const logMeal = '/log-meal';
   static const review = '/review';
   static const summary = '/summary';
   static const profile = '/profile';
@@ -111,8 +110,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.progress,
         builder: (context, state) => const ProgressScreen(),
       ),
-      // Additional routes wired in later phases:
-      // GoRoute(path: AppRoutes.logMeal, ...),
     ],
   );
 
