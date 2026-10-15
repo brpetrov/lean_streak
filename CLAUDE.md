@@ -29,7 +29,7 @@ The web build outputs to `build/hosting`. Firebase Hosting serves it with SPA re
 ## Key Domain Logic
 
 - **Health calculations** (`lib/helpers/health_calculator.dart`): Pure functions for BMI, BMR (Mifflin-St Jeor), TDEE, and daily calorie targets. Has safety floors. Extensively tested.
-- **Daily summaries** (`lib/services/daily_summary_service.dart`): Recomputed from meals whenever a meal is logged/edited. Includes calorie totals, tag counts, and a green/yellow/red status based on adherence to target (±10% green, ±20% yellow, else red).
+- **Daily summaries** (`lib/services/daily_summary_service.dart`): Recomputed from meals whenever a meal is logged/edited. Includes calorie totals, meal count, and a green/yellow/red status based on adherence to target (±10% green, ±20% yellow, else red).
 - **AI calorie estimation** (`lib/services/calorie_estimate_service.dart`): Uses Google Gemini 2.5 Flash to estimate calories from meal descriptions. Has a daily usage limit (10/user/day) tracked in Firestore.
 - **Period reviews** (`lib/services/period_review_service.dart`): Aggregates daily summaries into weekly/monthly review data.
 
@@ -37,7 +37,7 @@ The web build outputs to `build/hosting`. Firebase Hosting serves it with SPA re
 
 All models use manual Firestore serialization (no codegen). Each model has `fromFirestore` / `toFirestore` methods. Enums use `fromString` factory constructors with legacy value handling (e.g., `ActivityLevel` accepts both old and new string formats).
 
-Key models: `UserProfile` (with enums for Gender, ActivityLevel, TrainingFrequency, WeightGoal, DeficitLevel), `Meal` (with `MealTag` enum categorized by tone: healthy/neutral/unhealthy), `DailySummary`, `CheckIn`, `PeriodReview`.
+Key models: `UserProfile` (with enums for Gender, ActivityLevel, TrainingFrequency, WeightGoal, DeficitLevel), `Meal` (name, calories, optional protein), `DailySummary`, `CheckIn`, `PeriodReview`.
 
 ## Conventions
 

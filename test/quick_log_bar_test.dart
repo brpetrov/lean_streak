@@ -17,8 +17,6 @@ class _FakeLogMealController extends LogMealController {
     String? name,
     required double calories,
     double? proteinGrams,
-    required List<MealTag> tags,
-    String? note,
   }) async {
     saved.add((name: name, calories: calories, protein: proteinGrams));
   }

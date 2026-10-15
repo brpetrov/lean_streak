@@ -58,10 +58,8 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
   final _nameController = TextEditingController();
   final _caloriesController = TextEditingController();
   final _proteinController = TextEditingController();
-  final _noteController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _speechToText = SpeechToText();
-  final Set<MealTag> _selectedTags = {};
 
   String? _errorMessage;
   late _CalorieInputMode _inputMode;
@@ -101,8 +99,6 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
     if (meal.proteinGrams != null) {
       _proteinController.text = meal.proteinGrams!.round().toString();
     }
-    _selectedTags.addAll(meal.tags.where((tag) => tag.isSelectable));
-    _noteController.text = meal.note ?? '';
   }
 
   @override
@@ -111,7 +107,6 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
     _nameController.dispose();
     _caloriesController.dispose();
     _proteinController.dispose();
-    _noteController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
@@ -138,8 +133,6 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
           name: _nameController.text,
           calories: calories!,
           proteinGrams: double.tryParse(_proteinController.text.trim()),
-          tags: _selectedTags.toList(),
-          note: _noteController.text,
         );
 
     if (!mounted) return;
@@ -581,62 +574,6 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
                       ),
                     ),
                   ),
-                  SizedBox(height: 24),
-                  const _SectionLabel('TAGS'),
-                  SizedBox(height: 4),
-                  Text(
-                    'Pick any that clearly apply. Leave blank if none fit.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  SizedBox(height: 12),
-                  _TagsSection(
-                    selected: _selectedTags,
-                    onToggle: (tag) => setState(() {
-                      if (_selectedTags.contains(tag)) {
-                        _selectedTags.remove(tag);
-                      } else {
-                        _selectedTags.add(tag);
-                      }
-                    }),
-                  ),
-                  SizedBox(height: 24),
-                  const _SectionLabel('NOTE (OPTIONAL)'),
-                  SizedBox(height: 10),
-                  TextField(
-                    controller: _noteController,
-                    maxLines: 2,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: AppColors.textPrimary,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Add anything useful about this meal',
-                      hintStyle: TextStyle(
-                        color: AppColors.textDisabled,
-                        fontSize: 14,
-                      ),
-                      filled: true,
-                      fillColor: AppColors.surfaceVariant,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: AppColors.primary,
-                          width: 2,
-                        ),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        vertical: 14,
-                        horizontal: 16,
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -1051,108 +988,6 @@ class _SectionLabel extends StatelessWidget {
         color: AppColors.textSecondary,
         letterSpacing: 1.0,
       ),
-    );
-  }
-}
-
-class _TagsSection extends StatelessWidget {
-  const _TagsSection({required this.selected, required this.onToggle});
-
-  final Set<MealTag> selected;
-  final ValueChanged<MealTag> onToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _TagGroup(
-          label: 'Healthy',
-          tags: MealTag.positive,
-          selected: selected,
-          onToggle: onToggle,
-          activeColor: AppColors.tagPositive,
-          activeBg: AppColors.tagPositiveBg,
-        ),
-        SizedBox(height: 14),
-        _TagGroup(
-          label: 'Neutral',
-          tags: MealTag.neutral,
-          selected: selected,
-          onToggle: onToggle,
-          activeColor: AppColors.tagNeutral,
-          activeBg: AppColors.tagNeutralBg,
-        ),
-        SizedBox(height: 14),
-        _TagGroup(
-          label: 'Unhealthy',
-          tags: MealTag.warning,
-          selected: selected,
-          onToggle: onToggle,
-          activeColor: AppColors.tagWarning,
-          activeBg: AppColors.tagWarningBg,
-        ),
-      ],
-    );
-  }
-}
-
-class _TagGroup extends StatelessWidget {
-  const _TagGroup({
-    required this.label,
-    required this.tags,
-    required this.selected,
-    required this.onToggle,
-    required this.activeColor,
-    required this.activeBg,
-  });
-
-  final String label;
-  final List<MealTag> tags;
-  final Set<MealTag> selected;
-  final ValueChanged<MealTag> onToggle;
-  final Color activeColor;
-  final Color activeBg;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: activeColor,
-          ),
-        ),
-        SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          children: tags.map((tag) {
-            final isSelected = selected.contains(tag);
-            return FilterChip(
-              label: Text(tag.label),
-              selected: isSelected,
-              onSelected: (_) => onToggle(tag),
-              selectedColor: activeBg,
-              backgroundColor: AppColors.surfaceVariant,
-              checkmarkColor: activeColor,
-              labelStyle: TextStyle(
-                color: isSelected ? activeColor : AppColors.textPrimary,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                fontSize: 13,
-              ),
-              side: BorderSide(
-                color: isSelected ? activeColor : AppColors.divider,
-              ),
-              showCheckmark: true,
-            );
-          }).toList(),
-        ),
-      ],
     );
   }
 }

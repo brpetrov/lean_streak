@@ -22,7 +22,6 @@ class DailySummary {
     required this.targetCalories,
     required this.calorieDelta,
     required this.mealCount,
-    required this.tagCounts,
     required this.status,
     required this.updatedAt,
   });
@@ -32,7 +31,6 @@ class DailySummary {
   final int targetCalories;
   final int calorieDelta;
   final int mealCount;
-  final Map<String, int> tagCounts;
   final DailyStatus status;
   final DateTime updatedAt;
 
@@ -52,9 +50,6 @@ class DailySummary {
       targetCalories: (data['targetCalories'] as num).round(),
       calorieDelta: (data['calorieDelta'] as num).round(),
       mealCount: data['mealCount'] as int,
-      tagCounts: (data['tagCounts'] as Map<String, dynamic>? ?? const {}).map(
-        (key, value) => MapEntry(key, (value as num).round()),
-      ),
       status: _statusFromFirestore(data),
       updatedAt: (data['updatedAt'] as Timestamp).toDate(),
     );
@@ -67,7 +62,6 @@ class DailySummary {
       'targetCalories': targetCalories,
       'calorieDelta': calorieDelta,
       'mealCount': mealCount,
-      'tagCounts': tagCounts,
       'status': status.value,
       'updatedAt': Timestamp.fromDate(updatedAt),
     };

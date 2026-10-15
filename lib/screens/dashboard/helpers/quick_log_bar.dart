@@ -85,7 +85,6 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
           name: entry.name,
           calories: entry.kcal!.toDouble(),
           proteinGrams: entry.protein?.toDouble(),
-          tags: const [],
         );
     if (!mounted) return;
 

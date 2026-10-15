@@ -273,22 +273,6 @@ class _PeriodSummaryContent extends StatelessWidget {
         SizedBox(height: 16),
         _DayHighlightsCard(review: review),
         SizedBox(height: 16),
-        _TagsCard(
-          title: 'Top healthy tags',
-          tags: review.topHelpfulTags,
-          emptyLabel: 'No healthy tags were saved in this period.',
-          chipColor: AppColors.tagPositive,
-          chipBackground: AppColors.tagPositiveBg,
-        ),
-        SizedBox(height: 16),
-        _TagsCard(
-          title: 'Top unhealthy tags',
-          tags: review.topRiskyTags,
-          emptyLabel: 'No unhealthy tags were saved in this period.',
-          chipColor: AppColors.tagWarning,
-          chipBackground: AppColors.tagWarningBg,
-        ),
-        SizedBox(height: 16),
         _GuidanceCard(guidance: review.guidance),
         SizedBox(height: 16),
         if (mode == _SummaryMode.month) ...[
@@ -709,76 +693,6 @@ class _DayHighlightTile extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _TagsCard extends StatelessWidget {
-  const _TagsCard({
-    required this.title,
-    required this.tags,
-    required this.emptyLabel,
-    required this.chipColor,
-    required this.chipBackground,
-  });
-
-  final String title;
-  final List<PeriodTagCount> tags;
-  final String emptyLabel;
-  final Color chipColor;
-  final Color chipBackground;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          SizedBox(height: 14),
-          if (tags.isEmpty)
-            Text(
-              emptyLabel,
-              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-            )
-          else
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: tags.map((tag) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: chipBackground,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    '${tag.label} (${tag.count})',
-                    style: TextStyle(
-                      color: chipColor,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-        ],
       ),
     );
   }
@@ -1220,42 +1134,6 @@ void _showSummaryDaySheet(BuildContext context, DailySummary summary) {
                     height: 1.5,
                   ),
                 ),
-                if (summary.tagCounts.isNotEmpty) ...[
-                  SizedBox(height: 24),
-                  Text(
-                    'Tag totals',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: summary.tagCounts.entries.map((entry) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceVariant,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          '${_formatTagLabel(entry.key)} (${entry.value})',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
               ],
             ),
           ),
@@ -1388,15 +1266,4 @@ String _statusDescription(DailySummary summary) {
   return summary.calorieDelta > 0
       ? 'Calories finished more than 20% above target.'
       : 'Calories finished more than 20% below target.';
-}
-
-String _formatTagLabel(String tag) {
-  return tag
-      .split('_')
-      .map(
-        (part) => part.isEmpty
-            ? part
-            : '${part[0].toUpperCase()}${part.substring(1)}',
-      )
-      .join(' ');
 }

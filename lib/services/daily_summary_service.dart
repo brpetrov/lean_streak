@@ -49,7 +49,6 @@ class DailySummaryService {
       return sum + meal.calories.round();
     });
     final calorieDelta = totalCalories - targetCalories;
-    final tagCounts = _buildTagCounts(meals);
 
     return DailySummary(
       date: date,
@@ -57,25 +56,12 @@ class DailySummaryService {
       targetCalories: targetCalories,
       calorieDelta: calorieDelta,
       mealCount: meals.length,
-      tagCounts: tagCounts,
       status: _statusForCalories(
         totalCalories: totalCalories,
         targetCalories: targetCalories,
       ),
       updatedAt: DateTime.now(),
     );
-  }
-
-  Map<String, int> _buildTagCounts(List<Meal> meals) {
-    final counts = <String, int>{};
-
-    for (final meal in meals) {
-      for (final tag in meal.tags) {
-        counts[tag.value] = (counts[tag.value] ?? 0) + 1;
-      }
-    }
-
-    return counts;
   }
 
   DailyStatus _statusForCalories({

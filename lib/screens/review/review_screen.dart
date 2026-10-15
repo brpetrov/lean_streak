@@ -788,42 +788,6 @@ class _ReviewDaySheet extends ConsumerWidget {
                   height: 1.5,
                 ),
               ),
-              if (summary.tagCounts.isNotEmpty) ...[
-                SizedBox(height: 24),
-                Text(
-                  'Tag totals',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: summary.tagCounts.entries.map((entry) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceVariant,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        '${_formatTagLabel(entry.key)} (${entry.value})',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ],
               SizedBox(height: 24),
               _AdjustCaloriesSection(
                 summary: summary,
@@ -1239,15 +1203,4 @@ String _statusDescription(DailySummary summary) {
   return summary.calorieDelta > 0
       ? 'Calories finished more than 20% above target.'
       : 'Calories finished more than 20% below target.';
-}
-
-String _formatTagLabel(String tag) {
-  return tag
-      .split('_')
-      .map(
-        (part) => part.isEmpty
-            ? part
-            : '${part[0].toUpperCase()}${part.substring(1)}',
-      )
-      .join(' ');
 }

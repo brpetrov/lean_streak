@@ -63,7 +63,6 @@ DailySummary _summary(
     targetCalories: targetCalories,
     calorieDelta: calories - targetCalories,
     mealCount: mealCount,
-    tagCounts: const {},
     status: status ?? DailyStatus.green,
     updatedAt: DateTime(2026, 4, 20),
   );

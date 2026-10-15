@@ -39,7 +39,6 @@ class PastDayEditController extends AsyncNotifier<void> {
   Future<void> adjustCalories({
     required String date,
     required double delta,
-    String? note,
   }) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
@@ -67,8 +66,6 @@ class PastDayEditController extends AsyncNotifier<void> {
         timestamp: dayTimestamp,
         name: delta >= 0 ? 'Calorie adjustment (+)' : 'Calorie adjustment (−)',
         calories: delta,
-        tags: const [],
-        note: (note?.trim().isEmpty ?? true) ? null : note!.trim(),
         createdAt: now,
         updatedAt: now,
       );

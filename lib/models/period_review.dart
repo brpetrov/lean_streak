@@ -1,18 +1,6 @@
 import 'package:lean_streak/models/check_in.dart';
 import 'package:lean_streak/models/daily_summary.dart';
 
-class PeriodTagCount {
-  const PeriodTagCount({
-    required this.key,
-    required this.label,
-    required this.count,
-  });
-
-  final String key;
-  final String label;
-  final int count;
-}
-
 class PeriodReview {
   const PeriodReview({
     required this.startDate,
@@ -29,8 +17,6 @@ class PeriodReview {
     required this.calorieConsistencyRate,
     required this.bestDay,
     required this.worstDay,
-    required this.topHelpfulTags,
-    required this.topRiskyTags,
     required this.checkIns,
     required this.guidance,
   });
@@ -49,8 +35,6 @@ class PeriodReview {
   final double calorieConsistencyRate;
   final DailySummary? bestDay;
   final DailySummary? worstDay;
-  final List<PeriodTagCount> topHelpfulTags;
-  final List<PeriodTagCount> topRiskyTags;
   final List<CheckIn> checkIns;
   final List<String> guidance;
 }
