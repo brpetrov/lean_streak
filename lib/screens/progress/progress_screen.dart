@@ -41,7 +41,9 @@ class ProgressScreen extends ConsumerWidget {
       body: entriesAsync.when(
         data: (entries) {
           if (entries.isEmpty) {
-            return _EmptyState(onLogWeight: () => _logWeight(context, ref));
+            return SafeArea(
+              child: _EmptyState(onLogWeight: () => _logWeight(context, ref)),
+            );
           }
           return ListView(
             padding: EdgeInsets.zero,

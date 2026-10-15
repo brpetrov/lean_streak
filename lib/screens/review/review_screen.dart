@@ -81,7 +81,12 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
       children: [
         ResponsivePage(
           maxWidth: 720,
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            8,
+            16,
+            24 + MediaQuery.paddingOf(context).bottom,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

@@ -166,7 +166,11 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
         24,
         0,
         24,
-        MediaQuery.viewInsetsOf(context).bottom + 24,
+        // useSafeArea only guards the top of a sheet. padding.bottom is the
+        // navigation bar and drops to 0 while the keyboard covers it.
+        MediaQuery.viewInsetsOf(context).bottom +
+            MediaQuery.paddingOf(context).bottom +
+            24,
       ),
       child: SingleChildScrollView(
         child: Column(

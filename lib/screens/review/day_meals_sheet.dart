@@ -89,7 +89,14 @@ class _DayMealsSheetState extends ConsumerState<DayMealsSheet> {
         maxHeight: MediaQuery.sizeOf(context).height * 0.85,
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 0, 12, 24),
+        // useSafeArea only guards the top of a sheet; clear the navigation
+        // bar here.
+        padding: EdgeInsets.fromLTRB(
+          24,
+          0,
+          12,
+          24 + MediaQuery.paddingOf(context).bottom,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
