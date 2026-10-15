@@ -33,11 +33,19 @@ Widget appShellBuilder(BuildContext context, Widget? child) {
   if (mediaQuery.size.width <= appMaxWidth) return child!;
 
   final theme = Theme.of(context);
+  // A slightly deeper margin with a hairline edge makes the column read as a
+  // page, so dialogs dimming only the column look intentional.
   return ColoredBox(
-    color: AppColors.background,
+    color: AppColors.surfaceVariant,
     child: Center(
-      child: SizedBox(
+      child: Container(
         width: appMaxWidth,
+        decoration: const BoxDecoration(
+          color: AppColors.background,
+          border: Border.symmetric(
+            vertical: BorderSide(color: AppColors.divider),
+          ),
+        ),
         child: MediaQuery(
           data: mediaQuery.copyWith(
             size: Size(

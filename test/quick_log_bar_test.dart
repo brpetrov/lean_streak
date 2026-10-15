@@ -14,6 +14,7 @@ class _FakeLogMealController extends LogMealController {
   @override
   Future<void> submit({
     Meal? existingMeal,
+    String? date,
     String? name,
     required double calories,
     double? proteinGrams,

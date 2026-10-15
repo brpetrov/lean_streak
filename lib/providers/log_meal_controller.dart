@@ -11,8 +11,11 @@ class LogMealController extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
 
+  /// Saves a new meal, or [existingMeal] with new values. New meals go on
+  /// [date] (yyyy-MM-dd), today by default.
   Future<void> submit({
     Meal? existingMeal,
+    String? date,
     String? name,
     required double calories,
     double? proteinGrams,
@@ -24,7 +27,8 @@ class LogMealController extends AsyncNotifier<void> {
 
       final repo = ref.read(mealRepositoryProvider);
       final now = DateTime.now();
-      final date = existingMeal?.date ?? DateFormat('yyyy-MM-dd').format(now);
+      final today = DateFormat('yyyy-MM-dd').format(now);
+      final mealDate = existingMeal?.date ?? date ?? today;
       final docRef = existingMeal == null ? repo.newMealRef(uid) : null;
       final mealName = (name?.trim().isEmpty ?? true) ? null : name!.trim();
 
@@ -38,8 +42,8 @@ class LogMealController extends AsyncNotifier<void> {
 
       final meal = Meal(
         id: existingMeal?.id ?? docRef!.id,
-        date: date,
-        timestamp: existingMeal?.timestamp ?? now,
+        date: mealDate,
+        timestamp: existingMeal?.timestamp ?? _timestampFor(mealDate, now),
         name: mealName,
         calories: calories,
         proteinGrams: protein,
@@ -53,9 +57,18 @@ class LogMealController extends AsyncNotifier<void> {
         await repo.updateMeal(uid, meal);
       }
 
-      await ref.read(dailySummaryServiceProvider).recomputeForDate(uid, date);
+      await ref
+          .read(dailySummaryServiceProvider)
+          .recomputeForDate(uid, mealDate);
       ref.invalidate(dailySummaryRepositoryProvider);
     });
+  }
+
+  /// A meal added to a past day keeps the current time of day, so it sorts
+  /// sensibly among that day's meals.
+  DateTime _timestampFor(String date, DateTime now) {
+    final day = DateTime.parse(date);
+    return DateTime(day.year, day.month, day.day, now.hour, now.minute);
   }
 
   Future<double?> _estimateProtein(String name, double calories) async {

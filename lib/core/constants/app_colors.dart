@@ -21,15 +21,6 @@ class AppColors {
   static const Color bad = Color(0xFFE8A75B);
   static const Color veryBad = Color(0xFFD64045);
 
-  static const Color tagPositive = veryGood;
-  static const Color tagPositiveBg = Color(0xFFE3F2EF);
-
-  static const Color tagNeutral = textSecondary;
-  static const Color tagNeutralBg = Color(0xFFEFF3F1);
-
-  static const Color tagWarning = bad;
-  static const Color tagWarningBg = Color(0xFFFDF3E7);
-
   static const Color divider = Color(0xFFE8E4DC);
   static const Color error = Color(0xFFD64045);
   static const Color shadow = Color(0x0A1F1D1A);

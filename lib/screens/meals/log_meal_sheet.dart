@@ -1,22 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:speech_to_text/speech_recognition_error.dart';
-import 'package:speech_to_text/speech_recognition_result.dart';
-import 'package:speech_to_text/speech_to_text.dart';
+import 'package:intl/intl.dart';
 
 import 'package:lean_streak/core/constants/app_colors.dart';
 import 'package:lean_streak/models/meal.dart';
 import 'package:lean_streak/providers/ai_usage_provider.dart';
 import 'package:lean_streak/providers/auth_provider.dart';
 import 'package:lean_streak/providers/log_meal_controller.dart';
-import 'package:lean_streak/repositories/ai_usage_repository.dart';
 import 'package:lean_streak/services/calorie_estimate_service.dart';
 
-/// Resolves to true when the meal was saved.
+/// Opens the meal form: edits [existingMeal], or adds a meal on [date]
+/// (yyyy-MM-dd, today by default). Resolves to true when the meal was saved.
 Future<bool?> showLogMealSheet(
   BuildContext context, {
   Meal? existingMeal,
+  String? date,
   String? initialName,
   int? initialCalories,
   int? initialProtein,
@@ -25,9 +24,10 @@ Future<bool?> showLogMealSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    backgroundColor: Colors.transparent,
+    showDragHandle: true,
     builder: (_) => _LogMealSheet(
       existingMeal: existingMeal,
+      date: date,
       initialName: initialName,
       initialCalories: initialCalories,
       initialProtein: initialProtein,
@@ -35,17 +35,17 @@ Future<bool?> showLogMealSheet(
   );
 }
 
-enum _CalorieInputMode { voice, manual, ai }
-
 class _LogMealSheet extends ConsumerStatefulWidget {
   const _LogMealSheet({
     this.existingMeal,
+    this.date,
     this.initialName,
     this.initialCalories,
     this.initialProtein,
   });
 
   final Meal? existingMeal;
+  final String? date;
   final String? initialName;
   final int? initialCalories;
   final int? initialProtein;
@@ -58,1125 +58,229 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
   final _nameController = TextEditingController();
   final _caloriesController = TextEditingController();
   final _proteinController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _speechToText = SpeechToText();
 
-  String? _errorMessage;
-  late _CalorieInputMode _inputMode;
   bool _estimating = false;
-  CalorieEstimate? _estimate;
-  String? _estimateError;
-  String? _speechError;
-  bool _speechAvailable = false;
-  bool _speechInitialized = false;
-
-  // Voice mode state
-  String _voiceRecognizedText = '';
-  VoiceMealParsed? _voiceParsed;
-  bool _voiceListening = false;
-  bool _voiceParsing = false;
-  String? _voiceError;
+  String? _estimateNote;
+  String? _error;
 
   bool get _isEditing => widget.existingMeal != null;
+
+  String get _date =>
+      widget.existingMeal?.date ??
+      widget.date ??
+      DateFormat('yyyy-MM-dd').format(DateTime.now());
 
   @override
   void initState() {
     super.initState();
-    _inputMode = _CalorieInputMode.manual;
-    _nameController.text = widget.initialName ?? '';
-    if (widget.initialCalories != null) {
-      _caloriesController.text = widget.initialCalories.toString();
-    }
-    if (widget.initialProtein != null) {
-      _proteinController.text = widget.initialProtein.toString();
-    }
-
     final meal = widget.existingMeal;
-    if (meal == null) return;
-
-    _nameController.text = meal.name ?? '';
-    _caloriesController.text = meal.calories.round().toString();
-    if (meal.proteinGrams != null) {
-      _proteinController.text = meal.proteinGrams!.round().toString();
-    }
+    _nameController.text = meal?.name ?? widget.initialName ?? '';
+    final calories = meal?.calories.round() ?? widget.initialCalories;
+    if (calories != null) _caloriesController.text = '$calories';
+    final protein = meal?.proteinGrams?.round() ?? widget.initialProtein;
+    if (protein != null) _proteinController.text = '$protein';
   }
 
   @override
   void dispose() {
-    _speechToText.cancel();
     _nameController.dispose();
     _caloriesController.dispose();
     _proteinController.dispose();
-    _descriptionController.dispose();
     super.dispose();
+  }
+
+  Future<void> _estimate() async {
+    final name = _nameController.text.trim();
+    final uid = ref.read(currentUidProvider);
+    if (name.isEmpty || uid == null) return;
+
+    setState(() {
+      _estimating = true;
+      _estimateNote = null;
+      _error = null;
+    });
+
+    try {
+      final result = await ref
+          .read(calorieEstimateServiceProvider)
+          .estimate(uid, name);
+      if (!mounted) return;
+      _caloriesController.text = '${result.kcal}';
+      if (result.protein != null) {
+        _proteinController.text = '${result.protein}';
+      }
+      _estimateNote = result.note;
+    } on DailyLimitExceededException {
+      _error = 'Daily AI limit reached. Enter the calories yourself.';
+    } on CalorieEstimateException catch (error) {
+      _error = error.message;
+    } catch (_) {
+      _error = 'Could not reach the AI right now.';
+    }
+
+    if (mounted) setState(() => _estimating = false);
   }
 
   Future<void> _submit() async {
     final calories = double.tryParse(_caloriesController.text.trim());
-
-    setState(() {
-      if (calories == null || calories <= 0) {
-        _errorMessage = _inputMode == _CalorieInputMode.ai
-            ? 'Estimate calories first, or switch to manual entry.'
-            : 'Enter a valid calorie amount.';
-      } else {
-        _errorMessage = null;
-      }
-    });
-
-    if (_errorMessage != null) return;
+    if (calories == null || calories <= 0) {
+      setState(() => _error = 'Enter the calories, or estimate them.');
+      return;
+    }
+    setState(() => _error = null);
 
     await ref
         .read(logMealControllerProvider.notifier)
         .submit(
           existingMeal: widget.existingMeal,
+          date: _date,
           name: _nameController.text,
-          calories: calories!,
+          calories: calories,
           proteinGrams: double.tryParse(_proteinController.text.trim()),
         );
 
     if (!mounted) return;
-
-    final controllerState = ref.read(logMealControllerProvider);
-    if (controllerState.hasError) {
-      setState(() => _errorMessage = 'Failed to save meal. Try again.');
+    if (ref.read(logMealControllerProvider).hasError) {
+      setState(() => _error = 'Could not save the meal. Try again.');
       return;
     }
-
     Navigator.of(context).pop(true);
   }
 
-  Future<void> _runEstimate() async {
-    final description = _descriptionController.text.trim();
-    if (description.isEmpty) return;
-
-    setState(() {
-      _estimating = true;
-      _estimate = null;
-      _estimateError = null;
-    });
-
-    try {
-      final uid = ref.read(currentUidProvider);
-      if (uid == null) throw Exception('Not authenticated');
-
-      final result = await ref
-          .read(calorieEstimateServiceProvider)
-          .estimate(uid, description);
-
-      if (!mounted) return;
-      setState(() {
-        _estimate = result;
-        _estimating = false;
-      });
-    } on DailyLimitExceededException {
-      if (!mounted) return;
-      setState(() {
-        _estimateError = 'Daily limit reached, resets tomorrow.';
-        _estimating = false;
-      });
-    } on CalorieEstimateException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _estimateError = 'Could not estimate calories. ${error.message}';
-        _estimating = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _estimateError = 'Unexpected error while estimating calories.';
-        _estimating = false;
-      });
-    }
-  }
-
-  void _useEstimate() {
-    if (_estimate == null) return;
-
-    _caloriesController.text = _estimate!.kcal.toString();
-    if (_estimate!.protein != null) {
-      _proteinController.text = _estimate!.protein.toString();
-    }
-    setState(() {
-      _estimate = null;
-      _estimateError = null;
-      _descriptionController.clear();
-    });
-  }
-
-  Future<void> _startVoiceListening() async {
-    // Tapping while listening = stop now and process what we have.
-    if (_speechToText.isListening) {
-      await _speechToText.stop();
-      if (!mounted) return;
-      setState(() => _voiceListening = false);
-      _maybeParseVoice();
-      return;
-    }
-
-    final available = await _ensureSpeechReady();
-    if (!available) {
-      setState(() =>
-          _voiceError = 'Speech input is not available on this device.');
-      return;
-    }
-
-    setState(() {
-      _voiceError = null;
-      _voiceRecognizedText = '';
-      _voiceParsed = null;
-      _voiceListening = true;
-    });
-
-    await _speechToText.listen(
-      onResult: (result) {
-        if (!mounted) return;
-        setState(() => _voiceRecognizedText = result.recognizedWords);
-        // A final result means the engine has settled — process immediately
-        // instead of waiting on the (unreliable) status callback.
-        if (result.finalResult) {
-          setState(() => _voiceListening = false);
-          _maybeParseVoice();
-        }
-      },
-      listenFor: const Duration(seconds: 30),
-      pauseFor: const Duration(seconds: 3),
-      listenOptions: SpeechListenOptions(partialResults: true),
-    );
-  }
-
-  /// Sends the captured transcript to the AI parser, guarding against
-  /// double-triggers from overlapping stop/finalResult/status events.
-  void _maybeParseVoice() {
-    if (_voiceRecognizedText.trim().isNotEmpty &&
-        _voiceParsed == null &&
-        !_voiceParsing) {
-      _parseVoiceWithAi();
-    }
-  }
-
-  void _useVoiceResult() {
-    if (_voiceParsed == null) return;
-    _nameController.text = _voiceParsed!.name;
-    _caloriesController.text = _voiceParsed!.kcal.toString();
-    if (_voiceParsed!.protein != null) {
-      _proteinController.text = _voiceParsed!.protein.toString();
-    }
-    setState(() {
-      _voiceParsed = null;
-      _voiceRecognizedText = '';
-    });
-  }
-
-  void _retryVoice() {
-    setState(() {
-      _voiceParsed = null;
-      _voiceRecognizedText = '';
-      _voiceError = null;
-      _voiceParsing = false;
-    });
-    _startVoiceListening();
-  }
-
-  Future<void> _parseVoiceWithAi() async {
-    setState(() {
-      _voiceParsing = true;
-      _voiceError = null;
-    });
-
-    try {
-      final result = await ref
-          .read(calorieEstimateServiceProvider)
-          .parseVoice(_voiceRecognizedText);
-
-      if (!mounted) return;
-      setState(() {
-        _voiceParsed = result;
-        _voiceParsing = false;
-      });
-    } on CalorieEstimateException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _voiceError = e.message;
-        _voiceParsing = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _voiceError = 'Could not process voice input. Try again.';
-        _voiceParsing = false;
-      });
-    }
-  }
-
-  Future<void> _toggleSpeechInput() async {
-    if (_speechToText.isListening) {
-      await _speechToText.stop();
-      if (mounted) {
-        setState(() {});
-      }
-      return;
-    }
-
-    final available = await _ensureSpeechReady();
-    if (!available) return;
-
-    setState(() {
-      _speechError = null;
-    });
-
-    await _speechToText.listen(
-      onResult: _onSpeechResult,
-      listenFor: const Duration(seconds: 25),
-      pauseFor: const Duration(seconds: 4),
-      listenOptions: SpeechListenOptions(partialResults: true),
-    );
-
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  Future<bool> _ensureSpeechReady() async {
-    if (_speechInitialized) {
-      if (!_speechAvailable) {
-        setState(() {
-          _speechError = 'Speech input is not available on this device.';
-        });
-      }
-      return _speechAvailable;
-    }
-
-    final available = await _speechToText.initialize(
-      onError: _onSpeechError,
-      onStatus: _onSpeechStatus,
-    );
-
-    if (!mounted) return false;
-
-    setState(() {
-      _speechInitialized = true;
-      _speechAvailable = available;
-      if (!available) {
-        _speechError = 'Speech input is not available on this device.';
-      }
-    });
-
-    return available;
-  }
-
-  void _onSpeechResult(SpeechRecognitionResult result) {
-    _descriptionController.value = TextEditingValue(
-      text: result.recognizedWords,
-      selection: TextSelection.collapsed(offset: result.recognizedWords.length),
-    );
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  void _onSpeechError(SpeechRecognitionError error) {
-    if (!mounted) return;
-    final message = error.errorMsg == 'error_no_match'
-        ? 'No speech detected. Tap the mic to try again.'
-        : 'Speech input failed. Try again.';
-    setState(() {
-      if (_inputMode == _CalorieInputMode.voice) {
-        _voiceError = message;
-        _voiceListening = false;
-      } else {
-        _speechError = message;
-      }
-    });
-  }
-
-  void _onSpeechStatus(String status) {
-    if (!mounted) return;
-    if (status == 'done' || status == 'notListening') {
-      if (_inputMode == _CalorieInputMode.voice) {
-        setState(() => _voiceListening = false);
-        // Fallback path in case finalResult never arrived.
-        _maybeParseVoice();
-      } else {
-        setState(() {});
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final isLoading = ref.watch(logMealControllerProvider).isLoading;
-    final usageCount = ref.watch(aiUsageTodayProvider).valueOrNull ?? 0;
-    final remaining = (AiUsageRepository.dailyLimit - usageCount).clamp(
-      0,
-      AiUsageRepository.dailyLimit,
-    );
-    final limitReached = remaining == 0;
-    final effectiveInputMode =
-        _inputMode == _CalorieInputMode.ai && limitReached
-            ? _CalorieInputMode.manual
-            : _inputMode;
-    final mediaQuery = MediaQuery.of(context);
-    final footerBottomPadding =
-        (mediaQuery.viewInsets.bottom > 0
-            ? mediaQuery.viewInsets.bottom
-            : mediaQuery.viewPadding.bottom) +
-        16;
+    final saving = ref.watch(logMealControllerProvider).isLoading;
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final dateLabel = _date == today
+        ? null
+        : DateFormat('EEEE, d MMMM').format(DateTime.parse(_date));
 
-    return Container(
-      constraints: BoxConstraints(maxHeight: mediaQuery.size.height * 0.92),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        24,
+        0,
+        24,
+        MediaQuery.viewInsetsOf(context).bottom + 24,
       ),
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Center(
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.divider,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          Flexible(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    _isEditing ? 'Edit Meal' : 'Log Meal',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  _ModeTabBar(
-                    selectedMode: effectiveInputMode,
-                    aiEnabled: !limitReached,
-                    onChanged: (mode) => setState(() {
-                      if (_speechToText.isListening) _speechToText.stop();
-                      _inputMode = mode;
-                      _estimate = null;
-                      _estimateError = null;
-                      _voiceParsed = null;
-                      _voiceRecognizedText = '';
-                      _voiceError = null;
-                      _voiceListening = false;
-                      _voiceParsing = false;
-                    }),
-                  ),
-                  SizedBox(height: 20),
-                  if (effectiveInputMode == _CalorieInputMode.voice)
-                    _VoiceInputSection(
-                      isListening: _voiceListening,
-                      parsing: _voiceParsing,
-                      recognizedText: _voiceRecognizedText,
-                      parsed: _voiceParsed,
-                      error: _voiceError,
-                      onToggleListening: _startVoiceListening,
-                      onUse: _useVoiceResult,
-                      onRetry: _retryVoice,
-                    )
-                  else if (effectiveInputMode == _CalorieInputMode.ai)
-                    _AiEstimatorSection(
-                      remaining: remaining,
-                      descriptionController: _descriptionController,
-                      estimating: _estimating,
-                      estimate: _estimate,
-                      estimateError: _estimateError,
-                      speechError: _speechError,
-                      isListening: _speechToText.isListening,
-                      speechEnabled: _speechAvailable || !_speechInitialized,
-                      onToggleSpeech: _toggleSpeechInput,
-                      onEstimate: _runEstimate,
-                      onUse: _useEstimate,
-                    )
-                  else
-                    _ManualCaloriesField(controller: _caloriesController),
-                  SizedBox(height: 24),
-                  const _SectionLabel('MEAL NAME (OPTIONAL)'),
-                  SizedBox(height: 10),
-                  TextField(
-                    controller: _nameController,
-                    textCapitalization: TextCapitalization.sentences,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: AppColors.textPrimary,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'e.g. Salmon, chicken salad, protein shake',
-                      hintStyle: TextStyle(
-                        color: AppColors.textDisabled,
-                        fontSize: 14,
-                      ),
-                      filled: true,
-                      fillColor: AppColors.surfaceVariant,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: AppColors.primary,
-                          width: 2,
-                        ),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        vertical: 14,
-                        horizontal: 16,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 24),
-                  const _SectionLabel('PROTEIN (G, OPTIONAL)'),
-                  SizedBox(height: 10),
-                  TextField(
-                    controller: _proteinController,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: AppColors.textPrimary,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Leave blank to estimate from the meal name',
-                      hintStyle: TextStyle(
-                        color: AppColors.textDisabled,
-                        fontSize: 14,
-                      ),
-                      filled: true,
-                      fillColor: AppColors.surfaceVariant,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: AppColors.primary,
-                          width: 2,
-                        ),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        vertical: 14,
-                        horizontal: 16,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          AnimatedPadding(
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOut,
-            padding: EdgeInsets.only(top: 8, bottom: footerBottomPadding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (_errorMessage != null) ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.error.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      _errorMessage!,
-                      style: TextStyle(color: AppColors.error, fontSize: 14),
-                    ),
-                  ),
-                  SizedBox(height: 12),
-                ],
-                FilledButton(
-                  onPressed: isLoading ? null : _submit,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    minimumSize: const Size.fromHeight(52),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: isLoading
-                      ? SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Text(
-                          _isEditing ? 'Update Meal' : 'Save Meal',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AiEstimatorSection extends StatelessWidget {
-  const _AiEstimatorSection({
-    required this.remaining,
-    required this.descriptionController,
-    required this.estimating,
-    required this.estimate,
-    required this.estimateError,
-    required this.speechError,
-    required this.isListening,
-    required this.speechEnabled,
-    required this.onToggleSpeech,
-    required this.onEstimate,
-    required this.onUse,
-  });
-
-  final int remaining;
-  final TextEditingController descriptionController;
-  final bool estimating;
-  final CalorieEstimate? estimate;
-  final String? estimateError;
-  final String? speechError;
-  final bool isListening;
-  final bool speechEnabled;
-  final VoidCallback onToggleSpeech;
-  final VoidCallback onEstimate;
-  final VoidCallback onUse;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Icon(
-              Icons.auto_awesome_rounded,
-              size: 16,
-              color: AppColors.primary,
-            ),
-            SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '$remaining left today',
-                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            Text(
+              _isEditing ? 'Edit meal' : 'Add meal',
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
               ),
             ),
-          ],
-        ),
-        SizedBox(height: 12),
-        TextField(
-          controller: descriptionController,
-          maxLines: 2,
-          style: TextStyle(fontSize: 14, color: AppColors.textPrimary),
-          decoration: InputDecoration(
-            hintText: 'e.g. grilled chicken with rice and salad',
-            hintStyle: TextStyle(color: AppColors.textDisabled, fontSize: 13),
-            filled: true,
-            fillColor: AppColors.surfaceVariant,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.primary, width: 2),
-            ),
-            suffixIcon: IconButton(
-              tooltip: isListening ? 'Stop speaking' : 'Speak meal',
-              onPressed: onToggleSpeech,
-              icon: Icon(
-                isListening ? Icons.mic : Icons.mic_none_rounded,
-                color: isListening
-                    ? AppColors.primary
-                    : speechEnabled
-                    ? AppColors.textSecondary
-                    : AppColors.textDisabled,
-              ),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              vertical: 12,
-              horizontal: 14,
-            ),
-          ),
-        ),
-        if (speechError != null) ...[
-          SizedBox(height: 8),
-          Text(
-            speechError!,
-            style: TextStyle(fontSize: 13, color: AppColors.error),
-          ),
-        ],
-        SizedBox(height: 10),
-        if (estimating)
-          Center(
-            child: SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.5,
-                color: AppColors.primary,
-              ),
-            ),
-          )
-        else
-          FilledButton.tonal(
-            onPressed: onEstimate,
-            style: FilledButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              backgroundColor: AppColors.surfaceVariant,
-              minimumSize: const Size.fromHeight(46),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Estimate calories',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-        if (estimate != null) ...[
-          SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.tagPositiveBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.tagPositive),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '~${estimate!.kcal} kcal',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.tagPositive,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        estimate!.note,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(width: 12),
-                TextButton(
-                  onPressed: onUse,
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.tagPositive,
-                    backgroundColor: AppColors.surface,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: Text(
-                    'Use this',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-        if (estimateError != null) ...[
-          SizedBox(height: 10),
-          Text(
-            estimateError!,
-            style: TextStyle(fontSize: 13, color: AppColors.error),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _ModeTabBar extends StatelessWidget {
-  const _ModeTabBar({
-    required this.selectedMode,
-    required this.aiEnabled,
-    required this.onChanged,
-  });
-
-  final _CalorieInputMode selectedMode;
-  final bool aiEnabled;
-  final ValueChanged<_CalorieInputMode> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      padding: const EdgeInsets.all(4),
-      child: Row(
-        children: [
-          _tab(_CalorieInputMode.voice, Icons.mic_rounded, 'Voice', true),
-          _tab(_CalorieInputMode.manual, Icons.edit_rounded, 'Manual', true),
-          _tab(
-            _CalorieInputMode.ai,
-            Icons.auto_awesome_rounded,
-            'AI',
-            aiEnabled,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _tab(
-    _CalorieInputMode mode,
-    IconData icon,
-    String label,
-    bool enabled,
-  ) {
-    final isSelected = selectedMode == mode;
-    final color = !enabled
-        ? AppColors.textDisabled
-        : isSelected
-            ? AppColors.primary
-            : AppColors.textSecondary;
-
-    return Expanded(
-      child: GestureDetector(
-        onTap: enabled ? () => onChanged(mode) : null,
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.surface : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: AppColors.shadow,
-                      blurRadius: 4,
-                      offset: Offset(0, 1),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 15, color: color),
-              SizedBox(width: 6),
+            if (dateLabel != null) ...[
+              const SizedBox(height: 2),
               Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                  color: color,
+                dateLabel,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
                 ),
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ManualCaloriesField extends StatelessWidget {
-  const _ManualCaloriesField({required this.controller});
-
-  final TextEditingController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Enter calories directly if you already know them.',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-        ),
-        SizedBox(height: 10),
-        TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 36,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-          decoration: InputDecoration(
-            hintText: '0',
-            hintStyle: TextStyle(
-              fontSize: 36,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textDisabled,
-            ),
-            suffixText: 'kcal',
-            suffixStyle: TextStyle(
-              fontSize: 15,
-              color: AppColors.textSecondary,
-            ),
-            filled: true,
-            fillColor: AppColors.surfaceVariant,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.primary, width: 2),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              vertical: 16,
-              horizontal: 20,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        color: AppColors.textSecondary,
-        letterSpacing: 1.0,
-      ),
-    );
-  }
-}
-
-class _VoiceInputSection extends StatelessWidget {
-  const _VoiceInputSection({
-    required this.isListening,
-    required this.parsing,
-    required this.recognizedText,
-    required this.parsed,
-    required this.error,
-    required this.onToggleListening,
-    required this.onUse,
-    required this.onRetry,
-  });
-
-  final bool isListening;
-  final bool parsing;
-  final String recognizedText;
-  final VoiceMealParsed? parsed;
-  final String? error;
-  final VoidCallback onToggleListening;
-  final VoidCallback onUse;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final showIdle =
-        !isListening && !parsing && parsed == null && recognizedText.isEmpty;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Describe what you ate, e.g. "I had sweets, around 300 calories"',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-        ),
-        SizedBox(height: 16),
-        Center(
-          child: GestureDetector(
-            onTap: parsed == null && !parsing ? onToggleListening : null,
-            child: Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isListening
-                    ? AppColors.primary.withValues(alpha: 0.1)
-                    : AppColors.surfaceVariant,
-              ),
-              child: Icon(
-                isListening ? Icons.mic : Icons.mic_none_rounded,
-                size: 36,
-                color:
-                    isListening ? AppColors.primary : AppColors.textSecondary,
+            const SizedBox(height: 20),
+            TextField(
+              controller: _nameController,
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.next,
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(
+                labelText: 'Meal',
+                hintText: 'e.g. Musaka, chicken wrap',
               ),
             ),
-          ),
-        ),
-        if (isListening) ...[
-          SizedBox(height: 12),
-          Center(
-            child: Text(
-              'Listening… tap the mic when done',
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-        if (recognizedText.isNotEmpty && parsed == null) ...[
-          SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceVariant,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              recognizedText,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 15, color: AppColors.textPrimary),
-            ),
-          ),
-        ],
-        if (parsing) ...[
-          SizedBox(height: 16),
-          Center(
-            child: SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.5,
-                color: AppColors.primary,
-              ),
-            ),
-          ),
-        ],
-        if (parsed != null) ...[
-          SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.tagPositiveBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.tagPositive),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(height: 12),
+            Row(
               children: [
-                Text(
-                  parsed!.name,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                Expanded(
+                  child: TextField(
+                    controller: _caloriesController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Calories',
+                      suffixText: 'kcal',
+                    ),
                   ),
                 ),
-                SizedBox(height: 4),
-                Text(
-                  '${parsed!.kcal} kcal',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.tagPositive,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _proteinController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _submit(),
+                    decoration: const InputDecoration(
+                      labelText: 'Protein',
+                      suffixText: 'g',
+                    ),
                   ),
-                ),
-                SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.tonal(
-                        onPressed: onRetry,
-                        style: FilledButton.styleFrom(
-                          foregroundColor: AppColors.textPrimary,
-                          backgroundColor: AppColors.surfaceVariant,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: Text(
-                          'Try again',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: onUse,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: Text(
-                          'Use this',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),
-          ),
-        ],
-        if (showIdle) ...[
-          SizedBox(height: 8),
-          Center(
-            child: Text(
-              'Tap the mic to start',
-              style: TextStyle(fontSize: 13, color: AppColors.textDisabled),
+            const SizedBox(height: 6),
+            const Text(
+              'Leave protein blank and it is estimated from the meal name.',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
-          ),
-        ],
-        if (error != null) ...[
-          SizedBox(height: 8),
-          Text(
-            error!,
-            style: TextStyle(fontSize: 13, color: AppColors.error),
-          ),
-        ],
-      ],
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _nameController.text.trim().isEmpty || _estimating
+                    ? null
+                    : _estimate,
+                icon: _estimating
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.auto_awesome_rounded, size: 18),
+                label: const Text('Estimate from name'),
+              ),
+            ),
+            if (_estimateNote != null)
+              Text(
+                _estimateNote!,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: const TextStyle(fontSize: 14, color: AppColors.error),
+              ),
+            ],
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: saving || _estimating ? null : _submit,
+              child: saving
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: AppColors.onPrimary,
+                      ),
+                    )
+                  : Text(_isEditing ? 'Save changes' : 'Save meal'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
