@@ -7,6 +7,7 @@ import 'package:lean_streak/core/constants/app_colors.dart';
 import 'package:lean_streak/providers/auth_controller.dart';
 import 'package:lean_streak/widgets/app_logo_mark.dart';
 import 'package:lean_streak/widgets/responsive_page.dart';
+import 'package:lean_streak/widgets/clickable.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
@@ -104,7 +105,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           child: ResponsivePage(
-            maxWidth: 600,
+            maxWidth: 560,
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
             child: Form(
               key: _formKey,
@@ -352,37 +353,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                               ),
                       ),
                     ),
-                    SizedBox(height: 20),
-
-                    // Switch mode link
-                    Center(
-                      child: GestureDetector(
-                        onTap: _switchMode,
-                        child: RichText(
-                          text: TextSpan(
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppColors.textSecondary,
-                            ),
-                            children: [
-                              TextSpan(
-                                text: _isSignIn
-                                    ? "Don't have an account? "
-                                    : 'Already have an account? ',
-                              ),
-                              TextSpan(
-                                text: _isSignIn ? 'Sign Up' : 'Sign In',
-                                style: TextStyle(
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-
                     SizedBox(height: 32),
                   ],
                 ),
@@ -411,7 +381,7 @@ class _TabButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: GestureDetector(
+      child: Clickable(
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),

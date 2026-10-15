@@ -143,7 +143,7 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
           return SafeArea(
             child: SingleChildScrollView(
               child: ResponsivePage(
-                maxWidth: 640,
+                maxWidth: 560,
                 padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
                 child: Form(
                   key: _formKey,

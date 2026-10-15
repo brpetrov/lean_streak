@@ -9,6 +9,7 @@ import 'package:lean_streak/providers/profile_controller.dart';
 import 'package:lean_streak/providers/user_profile_provider.dart';
 import 'package:lean_streak/widgets/health_plan_preview_card.dart';
 import 'package:lean_streak/widgets/responsive_page.dart';
+import 'package:lean_streak/widgets/clickable.dart';
 
 class PlanSettingsScreen extends ConsumerStatefulWidget {
   const PlanSettingsScreen({super.key});
@@ -163,7 +164,7 @@ class _PlanSettingsScreenState extends ConsumerState<PlanSettingsScreen> {
           return SafeArea(
             child: SingleChildScrollView(
               child: ResponsivePage(
-                maxWidth: 640,
+                maxWidth: 560,
                 padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
                 child: Form(
                   key: _formKey,
@@ -509,7 +510,7 @@ class _GenderButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: GestureDetector(
+      child: Clickable(
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
@@ -934,7 +935,7 @@ class _SelectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return Clickable(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),

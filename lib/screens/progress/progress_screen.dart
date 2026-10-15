@@ -24,13 +24,19 @@ class ProgressScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Weight & Progress')),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _logWeight(context, ref),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Log weight'),
+      appBar: AppBar(
+        title: const Text('Weight & Progress'),
+        actions: [
+          // The empty state has its own button, so only show this one once
+          // there is history.
+          if (entriesAsync.valueOrNull?.isNotEmpty ?? false)
+            TextButton.icon(
+              onPressed: () => _logWeight(context, ref),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Log weight'),
+            ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: entriesAsync.when(
         data: (entries) {
@@ -46,7 +52,7 @@ class ProgressScreen extends ConsumerWidget {
                   20,
                   20,
                   20,
-                  MediaQuery.of(context).padding.bottom + 96,
+                  MediaQuery.of(context).padding.bottom + 32,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -199,6 +205,7 @@ class _WeightChartCard extends StatelessWidget {
     maxY += pad;
 
     final maxX = spots.last.x == 0 ? 1.0 : spots.last.x;
+    final labelInterval = math.max(1.0, (maxX / 4).floorToDouble());
 
     return AppCard(
       padding: const EdgeInsets.fromLTRB(8, 20, 16, 12),
@@ -246,8 +253,13 @@ class _WeightChartCard extends StatelessWidget {
                 sideTitles: SideTitles(
                   showTitles: true,
                   reservedSize: 28,
-                  interval: math.max(1, (maxX / 4).floorToDouble()),
+                  interval: labelInterval,
                   getTitlesWidget: (value, meta) {
+                    // fl_chart always adds a label at the end of the axis,
+                    // which collides with the last regular one.
+                    if (value == meta.max && value % labelInterval != 0) {
+                      return const SizedBox.shrink();
+                    }
                     final date = firstDate.add(Duration(days: value.round()));
                     return Padding(
                       padding: const EdgeInsets.only(top: 6),

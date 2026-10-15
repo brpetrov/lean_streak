@@ -21,12 +21,6 @@ class HealthPlanPreviewCard extends StatelessWidget {
     GoalPaceLevel.warning => AppColors.veryBad,
   };
 
-  double get _dailyDeficit {
-    return (preview.tdee - preview.dailyCalorieTarget)
-        .clamp(0, double.infinity)
-        .toDouble();
-  }
-
   String get _paceLabel {
     if (preview.isMaintaining) return 'Maintenance plan';
     if (preview.calorieTargetClamped) return 'Minimum calorie floor';
@@ -63,41 +57,16 @@ class HealthPlanPreviewCard extends StatelessWidget {
     return '${preview.goalPaceKgPerWeek.toStringAsFixed(2)} kg/wk';
   }
 
-  String get _targetWeightLabel {
-    if (preview.isMaintaining) return 'Maintain';
-    return '${_formatWeight(preview.targetWeightKg)} kg';
-  }
-
-  String get _dailyDeficitLabel {
-    if (preview.isMaintaining) return '0 kcal/day';
-    return '${_dailyDeficit.round()} kcal/day';
-  }
-
   @override
   Widget build(BuildContext context) {
+    // Maintenance, deficit and the multipliers live in the info dialog.
     final metrics = [
       _PlanMetric(
         label: 'Daily target',
         value: '${preview.dailyCalorieTarget.round()} kcal',
       ),
-      _PlanMetric(label: 'Maintenance', value: '${preview.tdee.round()} kcal'),
-      _PlanMetric(label: 'Daily deficit', value: _dailyDeficitLabel),
       _PlanMetric(label: 'Weekly loss', value: _weeklyLossLabel),
-      _PlanMetric(label: 'Target weight', value: _targetWeightLabel),
       _PlanMetric(label: 'Goal by', value: _goalDateLabel),
-      _PlanMetric(label: 'BMR', value: '${preview.bmr.round()} kcal'),
-      _PlanMetric(
-        label: 'Lifestyle',
-        value: 'x${preview.lifestyleMultiplier.toStringAsFixed(2)}',
-      ),
-      _PlanMetric(
-        label: 'Training',
-        value: '+${preview.trainingMultiplierBonus.toStringAsFixed(2)}',
-      ),
-      _PlanMetric(
-        label: 'Activity',
-        value: 'x${preview.activityMultiplier.toStringAsFixed(2)}',
-      ),
     ];
 
     return Container(
@@ -323,7 +292,7 @@ class _MetricGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth < 460 ? 2 : 4;
+        final columns = constraints.maxWidth < 300 ? 2 : 3;
         const spacing = 12.0;
         final itemWidth =
             (constraints.maxWidth - (spacing * (columns - 1))) / columns;
@@ -378,11 +347,4 @@ class _PlanMetric {
 
   final String label;
   final String value;
-}
-
-String _formatWeight(double value) {
-  if (value == value.roundToDouble()) {
-    return value.round().toString();
-  }
-  return value.toStringAsFixed(1);
 }

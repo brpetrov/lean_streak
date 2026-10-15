@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Run Commands
 
 ```bash
-flutter run -d chrome          # Run web (primary target)
+flutter run -d edge            # Run web (primary target; -d chrome where Chrome is installed)
 flutter run -d android          # Run on Android device/emulator
 flutter test                    # Run all tests
 flutter test test/health_calculator_test.dart   # Run a single test file
@@ -14,13 +14,17 @@ firebase deploy --only hosting  # Deploy web build to Firebase Hosting
 firebase deploy --only firestore:rules  # Deploy Firestore security rules
 ```
 
-The web build outputs to `build/hosting`. Firebase Hosting serves it with SPA rewrites.
+`tools/build_hosting.ps1` builds the web app into `build/hosting` (an `/app` build plus a `/webkit` build for Safari/iOS, behind a small redirect page). Firebase Hosting serves it with SPA rewrites.
 
 ## Architecture
 
 **State management:** Riverpod. StreamProviders for real-time Firestore data, StateNotifier-style controllers for mutations.
 
 **Routing:** GoRouter with reactive auth-based redirects. The router listens to both `authStateProvider` and `userProfileProvider` and enforces: Splash → Auth → Onboarding → Dashboard. Route names live in `AppRoutes` in `lib/app/router.dart`.
+
+**Screens:** Today (`DashboardScreen`) is home: calories/protein, the day's meals, a month graph and weight, with the quick-log bar pinned at the bottom (type `chicken wrap 450`, or use the mic). There are no bottom tabs; the top-left menu opens Review, Weight & Progress, Plan Settings and Account Settings as pushed pages. Review combines a week/month calendar with the period review; tapping a day opens its meals for adding, editing or deleting.
+
+**Styling:** Light mode only. `AppColors` is a fixed warm palette and `AppTheme` is built from it; use `AppCard` (`lib/widgets/app_card.dart`) for cards rather than hand-built containers. On wide browser windows `appShellBuilder` (`lib/app/app.dart`) shows the app as one centred column.
 
 **Data flow:** Repository pattern. Each Firestore collection has a repository (`lib/repositories/`) that handles reads/writes. Services (`lib/services/`) compose repositories for business logic. Providers (`lib/providers/`) expose state to the UI and wire up controllers.
 
@@ -30,8 +34,10 @@ The web build outputs to `build/hosting`. Firebase Hosting serves it with SPA re
 
 - **Health calculations** (`lib/helpers/health_calculator.dart`): Pure functions for BMI, BMR (Mifflin-St Jeor), TDEE, and daily calorie targets. Has safety floors. Extensively tested.
 - **Daily summaries** (`lib/services/daily_summary_service.dart`): Recomputed from meals whenever a meal is logged/edited. Includes calorie totals, meal count, and a green/yellow/red status based on adherence to target (±10% green, ±20% yellow, else red).
-- **AI calorie estimation** (`lib/services/calorie_estimate_service.dart`): Uses Google Gemini 2.5 Flash to estimate calories from meal descriptions. Has a daily usage limit (10/user/day) tracked in Firestore.
-- **Period reviews** (`lib/services/period_review_service.dart`): Aggregates daily summaries into weekly/monthly review data.
+- **AI calorie estimation** (`lib/services/calorie_estimate_service.dart`): Uses Gemini 3.5 Flash-Lite with prompts tuned for UK portions and Bulgarian home cooking; returns calories and protein. Typed estimates have a daily limit (`AiUsageRepository.dailyLimit`, 20/user/day) tracked in Firestore.
+- **Period reviews** (`lib/services/period_review_service.dart`): Aggregates daily summaries into weekly/monthly review data, shown under the Review calendar for finished days.
+- **Past-day changes** (`lib/providers/log_meal_controller.dart`): adding, editing or deleting a meal on an earlier day uses one of 10 changes per calendar month (`DayEditRepository.monthlyLimit`).
+- **Today isn't judged mid-day:** a day only shows its green/yellow/red status once it is finished, on track, or over target (`hasSettledStatus` in `lib/widgets/day_status.dart`).
 
 ## Models
 
