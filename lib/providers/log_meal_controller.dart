@@ -6,13 +6,17 @@ import 'package:lean_streak/providers/ai_usage_provider.dart';
 import 'package:lean_streak/providers/auth_provider.dart';
 import 'package:lean_streak/providers/daily_summary_provider.dart';
 import 'package:lean_streak/providers/meal_provider.dart';
+import 'package:lean_streak/providers/past_day_edit_provider.dart';
+import 'package:lean_streak/repositories/day_edit_repository.dart';
 
 class LogMealController extends AsyncNotifier<void> {
   @override
   Future<void> build() async {}
 
   /// Saves a new meal, or [existingMeal] with new values. New meals go on
-  /// [date] (yyyy-MM-dd), today by default.
+  /// [date] (yyyy-MM-dd), today by default. Changing a past day uses one of
+  /// the month's past-day changes; the state errors with
+  /// [EditLimitExceededException] once they are used up.
   Future<void> submit({
     Meal? existingMeal,
     String? date,
@@ -29,6 +33,8 @@ class LogMealController extends AsyncNotifier<void> {
       final now = DateTime.now();
       final today = DateFormat('yyyy-MM-dd').format(now);
       final mealDate = existingMeal?.date ?? date ?? today;
+      final pastDay = isPastDay(mealDate, now);
+      if (pastDay) await _ensurePastDayChangeLeft(uid);
       final docRef = existingMeal == null ? repo.newMealRef(uid) : null;
       final mealName = (name?.trim().isEmpty ?? true) ? null : name!.trim();
 
@@ -56,12 +62,28 @@ class LogMealController extends AsyncNotifier<void> {
       } else {
         await repo.updateMeal(uid, meal);
       }
+      if (pastDay) await _countPastDayChange(uid);
 
       await ref
           .read(dailySummaryServiceProvider)
           .recomputeForDate(uid, mealDate);
       ref.invalidate(dailySummaryRepositoryProvider);
     });
+  }
+
+  Future<void> _ensurePastDayChangeLeft(String uid) async {
+    final used = await ref
+        .read(dayEditRepositoryProvider)
+        .fetchCount(uid, currentEditMonthKey());
+    if (used >= DayEditRepository.monthlyLimit) {
+      throw const EditLimitExceededException();
+    }
+  }
+
+  Future<void> _countPastDayChange(String uid) {
+    return ref
+        .read(dayEditRepositoryProvider)
+        .increment(uid, currentEditMonthKey());
   }
 
   /// A meal added to a past day keeps the current time of day, so it sorts
@@ -89,7 +111,10 @@ class LogMealController extends AsyncNotifier<void> {
       final uid = ref.read(currentUidProvider);
       if (uid == null) throw Exception('Not authenticated');
 
+      final pastDay = isPastDay(meal.date, DateTime.now());
+      if (pastDay) await _ensurePastDayChangeLeft(uid);
       await ref.read(mealRepositoryProvider).deleteMeal(uid, meal.id);
+      if (pastDay) await _countPastDayChange(uid);
       await ref
           .read(dailySummaryServiceProvider)
           .recomputeForDate(uid, meal.date);

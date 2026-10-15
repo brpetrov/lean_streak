@@ -8,6 +8,7 @@ import 'package:lean_streak/models/meal.dart';
 import 'package:lean_streak/providers/ai_usage_provider.dart';
 import 'package:lean_streak/providers/auth_provider.dart';
 import 'package:lean_streak/providers/log_meal_controller.dart';
+import 'package:lean_streak/providers/past_day_edit_provider.dart';
 import 'package:lean_streak/services/calorie_estimate_service.dart';
 
 /// Opens the meal form: edits [existingMeal], or adds a meal on [date]
@@ -140,8 +141,13 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
         );
 
     if (!mounted) return;
-    if (ref.read(logMealControllerProvider).hasError) {
-      setState(() => _error = 'Could not save the meal. Try again.');
+    final result = ref.read(logMealControllerProvider);
+    if (result.hasError) {
+      setState(
+        () => _error = result.error is EditLimitExceededException
+            ? 'No past-day changes left this month.'
+            : 'Could not save the meal. Try again.',
+      );
       return;
     }
     Navigator.of(context).pop(true);

@@ -47,6 +47,38 @@ void main() {
       expect(review.totalCalories, 3800);
       expect(review.averageCaloriesPerDay, 1900);
     });
+
+    group('inconsistent-logging note', () {
+      const note =
+          'Logging was inconsistent. More complete logging will make the review more useful.';
+
+      test('is fair to a week that is only part way through', () {
+        final review = PeriodReviewService().buildReview(
+          startDate: DateTime(2026, 4, 6),
+          endDate: DateTime(2026, 4, 8),
+          summaries: [
+            _summary('2026-04-06', calories: 1900),
+            _summary('2026-04-08', calories: 2000),
+          ],
+        );
+
+        expect(review.guidance, isNot(contains(note)));
+      });
+
+      test('still appears when most of a full week is missing', () {
+        final review = PeriodReviewService().buildReview(
+          startDate: DateTime(2026, 4, 6),
+          endDate: DateTime(2026, 4, 12),
+          summaries: [
+            _summary('2026-04-06', calories: 1900),
+            _summary('2026-04-08', calories: 2000),
+            _summary('2026-04-10', calories: 1950),
+          ],
+        );
+
+        expect(review.guidance, contains(note));
+      });
+    });
   });
 }
 

@@ -13,7 +13,6 @@ import 'package:lean_streak/screens/profile/profile_load_error_screen.dart';
 import 'package:lean_streak/screens/profile/profile_screen.dart';
 import 'package:lean_streak/screens/progress/progress_screen.dart';
 import 'package:lean_streak/screens/review/review_screen.dart';
-import 'package:lean_streak/screens/summary/summary_screen.dart';
 import 'package:lean_streak/widgets/splash_screen.dart';
 
 // ---------------------------------------------------------------------------
@@ -27,7 +26,6 @@ class AppRoutes {
   static const profileLoadError = '/profile-load-error';
   static const dashboard = '/dashboard';
   static const review = '/review';
-  static const summary = '/summary';
   static const profile = '/profile';
   static const planSettings = '/plan-settings';
   static const progress = '/progress';
@@ -93,10 +91,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.review,
         builder: (context, state) => const ReviewScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.summary,
-        builder: (context, state) => const SummaryScreen(),
       ),
       GoRoute(
         path: AppRoutes.profile,

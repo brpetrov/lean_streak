@@ -107,14 +107,6 @@ class _AppDrawer extends ConsumerWidget {
               },
             ),
             ListTile(
-              leading: Icon(Icons.insights_outlined),
-              title: Text('Summary'),
-              onTap: () {
-                Navigator.of(context).pop();
-                context.push(AppRoutes.summary);
-              },
-            ),
-            ListTile(
               leading: Icon(Icons.monitor_weight_outlined),
               title: Text('Weight & Progress'),
               onTap: () {

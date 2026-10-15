@@ -18,7 +18,12 @@ class _FakeLogMealController extends LogMealController {
     required double calories,
     double? proteinGrams,
   }) async {
-    saved.add((date: date, name: name, calories: calories, edited: existingMeal));
+    saved.add((
+      date: date,
+      name: name,
+      calories: calories,
+      edited: existingMeal,
+    ));
   }
 }
 

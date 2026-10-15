@@ -105,8 +105,10 @@ class PeriodReviewService {
       guidance.add('Most logged days were well above or below target.');
     }
 
+    // About 4 days in 7 for weeks, half for months, scaled to the days that
+    // have passed so a week in progress isn't judged as a full one.
     final minimumLoggedDays = daysInPeriod <= 7
-        ? 4
+        ? (daysInPeriod * 4 / 7).ceil()
         : (daysInPeriod * 0.5).ceil();
     if (loggedDays < minimumLoggedDays) {
       guidance.add(

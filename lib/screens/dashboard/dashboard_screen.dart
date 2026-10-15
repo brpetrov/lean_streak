@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -27,6 +25,9 @@ import 'package:lean_streak/screens/progress/helpers/log_weight_dialog.dart';
 import 'package:lean_streak/services/check_in_service.dart';
 import 'package:lean_streak/widgets/app_card.dart';
 import 'package:lean_streak/widgets/app_frame.dart';
+import 'package:lean_streak/widgets/calorie_bars.dart';
+import 'package:lean_streak/widgets/day_status.dart';
+import 'package:lean_streak/widgets/meal_row.dart';
 import 'package:lean_streak/widgets/responsive_page.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -365,7 +366,7 @@ class _TodayCard extends StatelessWidget {
       ),
       _ when summary.calorieDelta > 0 => (
         'Over target',
-        _statusColor(summary.status),
+        dayStatusColor(summary.status),
       ),
       _ => (null, AppColors.primary),
     };
@@ -404,7 +405,7 @@ class _TodayCard extends StatelessWidget {
                 ),
               ),
               if (pillLabel != null)
-                _StatusPill(label: pillLabel, color: barColor),
+                StatusPill(label: pillLabel, color: barColor),
             ],
           ),
           const SizedBox(height: 14),
@@ -473,32 +474,6 @@ class _ProgressBar extends StatelessWidget {
   }
 }
 
-class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.w700,
-          fontSize: 12,
-        ),
-      ),
-    );
-  }
-}
-
 /// Today's meals as plain rows in one card.
 class _MealsCard extends StatelessWidget {
   const _MealsCard({
@@ -554,7 +529,7 @@ class _MealsCard extends StatelessWidget {
           else
             for (var index = 0; index < meals.length; index++) ...[
               if (index > 0) const Divider(height: 1),
-              _MealRow(
+              MealRow(
                 meal: meals[index],
                 onEdit: () => onEditMeal(meals[index]),
                 onDelete: () => onDeleteMeal(meals[index]),
@@ -565,95 +540,6 @@ class _MealsCard extends StatelessWidget {
     );
   }
 }
-
-class _MealRow extends StatelessWidget {
-  const _MealRow({
-    required this.meal,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  final Meal meal;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final name = (meal.name?.trim().isNotEmpty ?? false)
-        ? meal.name!.trim()
-        : 'Unnamed meal';
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  DateFormat('HH:mm').format(meal.timestamp),
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${meal.calories.round()} kcal',
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              if (meal.proteinGrams != null) ...[
-                const SizedBox(height: 2),
-                Text(
-                  '${meal.proteinGrams!.round()} g protein',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ],
-          ),
-          PopupMenuButton<_MealAction>(
-            tooltip: 'Meal options',
-            onSelected: (action) {
-              if (action == _MealAction.edit) {
-                onEdit();
-                return;
-              }
-              onDelete();
-            },
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: _MealAction.edit, child: Text('Edit')),
-              PopupMenuItem(value: _MealAction.delete, child: Text('Delete')),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-enum _MealAction { edit, delete }
 
 class _MonthPreviewCard extends ConsumerWidget {
   const _MonthPreviewCard({required this.date, required this.onOpenReview});
@@ -714,15 +600,19 @@ class _MonthPreviewCard extends ConsumerWidget {
                   )
                   .whereType<DailySummary>()
                   .toList();
-              int count(DailyStatus status) =>
-                  summaries.where((summary) => summary.status == status).length;
+              int count(DailyStatus status) => summaries
+                  .where(
+                    (summary) =>
+                        summary.status == status && hasSettledStatus(summary),
+                  )
+                  .length;
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SizedBox(
                     height: 80,
-                    child: _MonthPreviewBars(
+                    child: CalorieBars(
                       days: days,
                       summariesByDate: summariesByDate,
                     ),
@@ -741,17 +631,17 @@ class _MonthPreviewCard extends ConsumerWidget {
                           ),
                         ),
                       ),
-                      _MiniStatusChip(
+                      StatusPill(
                         label: '${count(DailyStatus.green)}',
                         color: AppColors.veryGood,
                       ),
                       const SizedBox(width: 6),
-                      _MiniStatusChip(
+                      StatusPill(
                         label: '${count(DailyStatus.yellow)}',
                         color: AppColors.bad,
                       ),
                       const SizedBox(width: 6),
-                      _MiniStatusChip(
+                      StatusPill(
                         label: '${count(DailyStatus.red)}',
                         color: AppColors.veryBad,
                       ),
@@ -777,119 +667,6 @@ class _MonthPreviewCard extends ConsumerWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _MonthPreviewBars extends StatelessWidget {
-  const _MonthPreviewBars({required this.days, required this.summariesByDate});
-
-  static const _minimumVisibleSlots = 12;
-  static const _maxBarWidth = 12.0;
-  static const _slotGutter = 3.0;
-
-  final List<DateTime> days;
-  final Map<String, DailySummary> summariesByDate;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final slotCount = math.max(days.length, _minimumVisibleSlots);
-        final slotWidth = constraints.maxWidth / slotCount;
-        final barWidth = math.min(
-          _maxBarWidth,
-          math.max(2.0, slotWidth - _slotGutter),
-        );
-
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: List.generate(slotCount, (index) {
-            final day = index < days.length ? days[index] : null;
-
-            return Expanded(
-              child: Center(
-                child: day == null
-                    ? const SizedBox.shrink()
-                    : SizedBox(
-                        width: barWidth,
-                        height: double.infinity,
-                        child: _MonthPreviewBar(
-                          day: day,
-                          summary: _summaryFor(day),
-                        ),
-                      ),
-              ),
-            );
-          }),
-        );
-      },
-    );
-  }
-
-  DailySummary? _summaryFor(DateTime day) {
-    return summariesByDate[DateFormat('yyyy-MM-dd').format(day)];
-  }
-}
-
-class _MonthPreviewBar extends StatelessWidget {
-  const _MonthPreviewBar({required this.day, required this.summary});
-
-  final DateTime day;
-  final DailySummary? summary;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = summary == null
-        ? AppColors.divider
-        : _statusColor(summary!.status);
-    final heightFactor = summary == null
-        ? 0.08
-        : ((summary!.totalCalories / summary!.targetCalories.clamp(1, 100000))
-                      .clamp(0.15, 1.25) /
-                  1.25)
-              .toDouble();
-    final tooltipMessage = summary == null
-        ? '${DateFormat('d MMM').format(day)}: no calories logged'
-        : '${DateFormat('d MMM').format(day)}: ${summary!.totalCalories} kcal';
-
-    return Tooltip(
-      message: tooltipMessage,
-      waitDuration: const Duration(milliseconds: 250),
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: FractionallySizedBox(
-          heightFactor: heightFactor,
-          child: Container(
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(999),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MiniStatusChip extends StatelessWidget {
-  const _MiniStatusChip({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 12),
       ),
     );
   }
@@ -952,12 +729,4 @@ class _WeightCard extends ConsumerWidget {
       ),
     );
   }
-}
-
-Color _statusColor(DailyStatus status) {
-  return switch (status) {
-    DailyStatus.green => AppColors.veryGood,
-    DailyStatus.yellow => AppColors.bad,
-    DailyStatus.red => AppColors.veryBad,
-  };
 }

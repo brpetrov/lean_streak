@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import 'package:lean_streak/core/constants/app_colors.dart';
+import 'package:lean_streak/models/check_in.dart';
 import 'package:lean_streak/models/daily_summary.dart';
-import 'package:lean_streak/providers/daily_summary_provider.dart';
-import 'package:lean_streak/providers/past_day_edit_provider.dart';
+import 'package:lean_streak/models/period_review.dart';
+import 'package:lean_streak/providers/period_review_provider.dart';
 import 'package:lean_streak/providers/review_provider.dart';
-import 'package:lean_streak/repositories/day_edit_repository.dart';
+import 'package:lean_streak/screens/review/day_meals_sheet.dart';
+import 'package:lean_streak/widgets/app_card.dart';
+import 'package:lean_streak/widgets/calorie_bars.dart';
+import 'package:lean_streak/widgets/day_status.dart';
 import 'package:lean_streak/widgets/responsive_page.dart';
 
+/// Calendar on top, the period's review underneath. Week and month share one
+/// switch; any day up to today opens its meals.
 class ReviewScreen extends ConsumerStatefulWidget {
   const ReviewScreen({super.key});
 
@@ -18,15 +23,11 @@ class ReviewScreen extends ConsumerStatefulWidget {
   ConsumerState<ReviewScreen> createState() => _ReviewScreenState();
 }
 
+enum _ReviewMode { week, month }
+
 class _ReviewScreenState extends ConsumerState<ReviewScreen> {
   _ReviewMode _mode = _ReviewMode.month;
-  late DateTime _focusedDate;
-
-  @override
-  void initState() {
-    super.initState();
-    _focusedDate = _dateOnly(DateTime.now());
-  }
+  DateTime _anchor = _dateOnly(DateTime.now());
 
   @override
   Widget build(BuildContext context) {
@@ -36,168 +37,116 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('Review')),
       body: periodsAsync.when(
-        data: (periods) {
-          final activePeriods = _mode == _ReviewMode.month
-              ? periods.monthStarts
-              : periods.weekStarts;
-
-          return RefreshIndicator(
-            color: AppColors.primary,
-            onRefresh: () async {
-              ref.invalidate(reviewPeriodsProvider);
-              await ref.read(reviewPeriodsProvider.future);
-            },
-            child: activePeriods.isEmpty
-                ? ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: EdgeInsets.zero,
-                    children: [
-                      ResponsivePage(
-                        maxWidth: 760,
-                        padding: EdgeInsets.fromLTRB(
-                          20,
-                          20,
-                          20,
-                          MediaQuery.of(context).padding.bottom + 28,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _ReviewHeader(),
-                            SizedBox(height: 20),
-                            _ReviewEmptyState(),
-                          ],
-                        ),
-                      ),
-                    ],
-                  )
-                : _ReviewContent(
-                    mode: _mode,
-                    focusedDate: _resolvedFocusedDate(
-                      _focusedDate,
-                      activePeriods,
-                      _mode,
-                    ),
-                    activePeriods: activePeriods,
-                    onModeChanged: (mode) {
-                      setState(() {
-                        _mode = mode;
-                      });
-                    },
-                    onFocusedDateChanged: (date) {
-                      setState(() {
-                        _focusedDate = date;
-                      });
-                    },
-                  ),
-          );
-        },
-        loading: () =>
-            Center(child: CircularProgressIndicator(color: AppColors.primary)),
-        error: (_, _) => const _ReviewErrorState(),
+        data: _buildContent,
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+        error: (_, _) => const Center(
+          child: Text(
+            'Could not load your review right now.',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+        ),
       ),
     );
   }
-}
 
-class _ReviewContent extends ConsumerWidget {
-  const _ReviewContent({
-    required this.mode,
-    required this.focusedDate,
-    required this.activePeriods,
-    required this.onModeChanged,
-    required this.onFocusedDateChanged,
-  });
-
-  final _ReviewMode mode;
-  final DateTime focusedDate;
-  final List<DateTime> activePeriods;
-  final ValueChanged<_ReviewMode> onModeChanged;
-  final ValueChanged<DateTime> onFocusedDateChanged;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final currentIndex = _periodIndexOf(activePeriods, focusedDate);
-    final range = mode == _ReviewMode.month
-        ? ReviewRange(
-            startDate: _firstDayOfMonth(focusedDate),
-            endDate: _lastDayOfMonth(focusedDate),
-          )
-        : ReviewRange(
-            startDate: _startOfWeek(focusedDate),
-            endDate: _endOfWeek(focusedDate),
-          );
-    final summariesAsync = ref.watch(reviewSummariesProvider(range));
-    final currentPeriod = mode == _ReviewMode.month
-        ? _firstDayOfMonth(_dateOnly(DateTime.now()))
-        : _startOfWeek(_dateOnly(DateTime.now()));
-    final currentPeriodIndex = _periodIndexOf(activePeriods, currentPeriod);
+  Widget _buildContent(ReviewPeriods periods) {
+    final today = _dateOnly(DateTime.now());
+    final start = _periodStart(_anchor, _mode);
+    final end = _periodEnd(_anchor, _mode);
+    final currentStart = _periodStart(today, _mode);
+    final logged = _mode == _ReviewMode.month
+        ? periods.monthStarts
+        : periods.weekStarts;
+    final firstStart = logged.fold<DateTime>(
+      currentStart,
+      (earliest, period) => period.isBefore(earliest) ? period : earliest,
+    );
+    // Only finished days are reviewed; today is still going.
+    final yesterday = today.subtract(const Duration(days: 1));
+    final reviewEnd = end.isAfter(yesterday) ? yesterday : end;
+    final summariesByDate =
+        ref
+            .watch(
+              reviewSummariesProvider(
+                ReviewRange(startDate: start, endDate: end),
+              ),
+            )
+            .valueOrNull ??
+        const <String, DailySummary>{};
 
     return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.zero,
       children: [
         ResponsivePage(
-          maxWidth: 760,
-          padding: EdgeInsets.fromLTRB(
-            20,
-            20,
-            20,
-            MediaQuery.of(context).padding.bottom + 28,
-          ),
+          maxWidth: 720,
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const _ReviewHeader(),
-              SizedBox(height: 20),
-              _ReviewModeSelector(mode: mode, onModeChanged: onModeChanged),
-              SizedBox(height: 16),
-              _ReviewPeriodBar(
-                label: _periodLabel(focusedDate, mode),
-                canGoBack: currentIndex > 0,
-                canGoForward:
-                    currentIndex >= 0 &&
-                    currentIndex < activePeriods.length - 1,
-                showTodayButton: currentPeriodIndex != -1,
-                isCurrentPeriod: currentPeriodIndex == currentIndex,
-                onPrevious: currentIndex > 0
-                    ? () =>
-                          onFocusedDateChanged(activePeriods[currentIndex - 1])
+              SegmentedButton<_ReviewMode>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(value: _ReviewMode.week, label: Text('Week')),
+                  ButtonSegment(value: _ReviewMode.month, label: Text('Month')),
+                ],
+                selected: {_mode},
+                onSelectionChanged: (selection) =>
+                    setState(() => _mode = selection.first),
+              ),
+              const SizedBox(height: 12),
+              _PeriodBar(
+                label: _periodLabel(start, _mode),
+                onPrevious: start.isAfter(firstStart)
+                    ? () => setState(() => _anchor = _shift(start, -1, _mode))
                     : null,
-                onNext:
-                    currentIndex >= 0 && currentIndex < activePeriods.length - 1
-                    ? () =>
-                          onFocusedDateChanged(activePeriods[currentIndex + 1])
+                onNext: start.isBefore(currentStart)
+                    ? () => setState(() => _anchor = _shift(start, 1, _mode))
                     : null,
-                onToday: currentPeriodIndex == -1
+                onToday: start == currentStart
                     ? null
-                    : () => onFocusedDateChanged(
-                        activePeriods[currentPeriodIndex],
-                      ),
+                    : () => setState(() => _anchor = today),
               ),
-              SizedBox(height: 12),
-              const _ReviewLegend(),
-              SizedBox(height: 20),
-              summariesAsync.when(
-                data: (summariesByDate) {
-                  return mode == _ReviewMode.month
-                      ? _MonthCalendar(
-                          month: focusedDate,
-                          summariesByDate: summariesByDate,
-                        )
-                      : _WeekCalendar(
-                          weekDate: focusedDate,
-                          summariesByDate: summariesByDate,
-                        );
-                },
-                loading: () => Padding(
-                  padding: EdgeInsets.only(top: 80),
-                  child: Center(
-                    child: CircularProgressIndicator(color: AppColors.primary),
-                  ),
+              const SizedBox(height: 12),
+              AppCard(
+                padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+                child: _Calendar(
+                  start: start,
+                  end: end,
+                  isMonth: _mode == _ReviewMode.month,
+                  summariesByDate: summariesByDate,
+                  onOpenDay: (day) => showDayMealsSheet(context, day),
                 ),
-                error: (_, _) => const _ReviewErrorState(),
               ),
+              const SizedBox(height: 12),
+              if (reviewEnd.isBefore(start))
+                const AppCard(
+                  child: Text(
+                    'The review fills in once a day in this period is over.',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                )
+              else
+                _PeriodReviewCard(
+                  range: PeriodReviewRange(
+                    startDate: start,
+                    endDate: reviewEnd,
+                  ),
+                  days: [
+                    for (
+                      var day = start;
+                      !day.isAfter(reviewEnd);
+                      day = DateTime(day.year, day.month, day.day + 1)
+                    )
+                      day,
+                  ],
+                  summariesByDate: summariesByDate,
+                  isMonth: _mode == _ReviewMode.month,
+                ),
             ],
           ),
         ),
@@ -206,124 +155,47 @@ class _ReviewContent extends ConsumerWidget {
   }
 }
 
-class _ReviewHeader extends StatelessWidget {
-  const _ReviewHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Text(
-            'Progress Calendar',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ),
-        IconButton(
-          tooltip: 'What is this screen for?',
-          onPressed: () => _showReviewInfoDialog(context),
-          icon: Icon(
-            Icons.info_outline_rounded,
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ReviewModeSelector extends StatelessWidget {
-  const _ReviewModeSelector({required this.mode, required this.onModeChanged});
-
-  final _ReviewMode mode;
-  final ValueChanged<_ReviewMode> onModeChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return SegmentedButton<_ReviewMode>(
-      showSelectedIcon: false,
-      segments: [
-        ButtonSegment(value: _ReviewMode.week, label: Text('Week')),
-        ButtonSegment(value: _ReviewMode.month, label: Text('Month')),
-      ],
-      selected: {mode},
-      onSelectionChanged: (selection) => onModeChanged(selection.first),
-    );
-  }
-}
-
-class _ReviewPeriodBar extends StatelessWidget {
-  const _ReviewPeriodBar({
+class _PeriodBar extends StatelessWidget {
+  const _PeriodBar({
     required this.label,
-    required this.canGoBack,
-    required this.canGoForward,
-    required this.showTodayButton,
-    required this.isCurrentPeriod,
     required this.onPrevious,
     required this.onNext,
     required this.onToday,
   });
 
   final String label;
-  final bool canGoBack;
-  final bool canGoForward;
-  final bool showTodayButton;
-  final bool isCurrentPeriod;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
   final VoidCallback? onToday;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18),
-      ),
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: Row(
         children: [
           IconButton(
-            onPressed: canGoBack ? onPrevious : null,
-            icon: Icon(Icons.chevron_left_rounded),
+            tooltip: 'Previous',
+            onPressed: onPrevious,
+            icon: const Icon(Icons.chevron_left_rounded),
           ),
           Expanded(
             child: Text(
               label,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 17,
+              style: const TextStyle(
+                fontSize: 16,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
               ),
             ),
           ),
-          if (showTodayButton)
-            OutlinedButton(
-              onPressed: isCurrentPeriod ? null : onToday,
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: AppColors.divider),
-                minimumSize: const Size(0, 40),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                visualDensity: VisualDensity.compact,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text('Today'),
-            ),
+          if (onToday != null)
+            TextButton(onPressed: onToday, child: const Text('Today')),
           IconButton(
-            onPressed: canGoForward ? onNext : null,
-            icon: Icon(Icons.chevron_right_rounded),
+            tooltip: 'Next',
+            onPressed: onNext,
+            icon: const Icon(Icons.chevron_right_rounded),
           ),
         ],
       ),
@@ -331,876 +203,422 @@ class _ReviewPeriodBar extends StatelessWidget {
   }
 }
 
-class _ReviewLegend extends StatelessWidget {
-  const _ReviewLegend();
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
-        _LegendChip(label: 'Green', color: AppColors.veryGood),
-        _LegendChip(label: 'Yellow', color: AppColors.bad),
-        _LegendChip(label: 'Red', color: AppColors.veryBad),
-        _LegendChip(
-          label: 'No data',
-          color: AppColors.textSecondary,
-          isHollow: true,
-        ),
-      ],
-    );
-  }
-}
-
-class _LegendChip extends StatelessWidget {
-  const _LegendChip({
-    required this.label,
-    required this.color,
-    this.isHollow = false,
+class _Calendar extends StatelessWidget {
+  const _Calendar({
+    required this.start,
+    required this.end,
+    required this.isMonth,
+    required this.summariesByDate,
+    required this.onOpenDay,
   });
 
-  final String label;
-  final Color color;
-  final bool isHollow;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(
-              color: isHollow ? Colors.transparent : color,
-              shape: BoxShape.circle,
-              border: Border.all(color: color),
-            ),
-          ),
-          SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WeekCalendar extends StatelessWidget {
-  const _WeekCalendar({required this.weekDate, required this.summariesByDate});
-
-  final DateTime weekDate;
+  final DateTime start;
+  final DateTime end;
+  final bool isMonth;
   final Map<String, DailySummary> summariesByDate;
+  final ValueChanged<DateTime> onOpenDay;
 
   @override
   Widget build(BuildContext context) {
-    final start = _startOfWeek(weekDate);
-    final days = List.generate(7, (index) => start.add(Duration(days: index)));
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'This week',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        SizedBox(height: 12),
-        _WeekdayHeader(days: days, compact: false),
-        SizedBox(height: 8),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: days.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 7,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-            childAspectRatio: 0.82,
-          ),
-          itemBuilder: (context, index) {
-            final date = days[index];
-            final summary = summariesByDate[_dateKey(date)];
-            return _ReviewDayCell(date: date, summary: summary);
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class _MonthCalendar extends StatelessWidget {
-  const _MonthCalendar({required this.month, required this.summariesByDate});
-
-  final DateTime month;
-  final Map<String, DailySummary> summariesByDate;
-
-  @override
-  Widget build(BuildContext context) {
-    final firstDay = _firstDayOfMonth(month);
-    final lastDay = _lastDayOfMonth(month);
-    final leadingEmptyCount = firstDay.weekday - 1;
-    final totalDays = lastDay.day;
-    final totalSlots = leadingEmptyCount + totalDays;
-    final trailingEmptyCount = (7 - (totalSlots % 7)) % 7;
-
+    final days = [
+      for (
+        var day = start;
+        !day.isAfter(end);
+        day = DateTime(day.year, day.month, day.day + 1)
+      )
+        day,
+    ];
+    final leading = isMonth ? start.weekday - 1 : 0;
+    final trailing = (7 - (leading + days.length) % 7) % 7;
     final cells = <DateTime?>[
-      ...List<DateTime?>.filled(leadingEmptyCount, null),
-      ...List.generate(
-        totalDays,
-        (index) => DateTime(month.year, month.month, index + 1),
-      ),
-      ...List<DateTime?>.filled(trailingEmptyCount, null),
+      ...List<DateTime?>.filled(leading, null),
+      ...days,
+      ...List<DateTime?>.filled(trailing, null),
     ];
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'This month',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
+        Row(
+          children: [
+            for (final label in [
+              'Mon',
+              'Tue',
+              'Wed',
+              'Thu',
+              'Fri',
+              'Sat',
+              'Sun',
+            ])
+              Expanded(
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        LayoutBuilder(
+          // Square cells on phones; flatter ones on wide screens so the
+          // review below stays in view.
+          builder: (context, constraints) => GridView.count(
+            crossAxisCount: 7,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 6,
+            crossAxisSpacing: 6,
+            childAspectRatio: switch ((isMonth, constraints.maxWidth > 520)) {
+              (true, true) => 1.6,
+              (true, false) => 1,
+              (false, true) => 1.2,
+              (false, false) => 0.85,
+            },
+            children: [
+              for (final day in cells)
+                day == null
+                    ? const SizedBox.shrink()
+                    : _DayCell(
+                        day: day,
+                        summary: summariesByDate[_dateKey(day)],
+                        onTap: () => onOpenDay(day),
+                      ),
+            ],
           ),
         ),
-        SizedBox(height: 12),
-        const _WeekdayHeader(),
-        SizedBox(height: 8),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: cells.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 7,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-            childAspectRatio: 0.9,
-          ),
-          itemBuilder: (context, index) {
-            final date = cells[index];
-            if (date == null) return const SizedBox.shrink();
-            return _ReviewDayCell(
-              date: date,
-              summary: summariesByDate[_dateKey(date)],
-            );
-          },
+        const SizedBox(height: 12),
+        const Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 14,
+          runSpacing: 6,
+          children: [
+            _LegendDot(label: 'On track', color: AppColors.veryGood),
+            _LegendDot(label: 'Close', color: AppColors.bad),
+            _LegendDot(label: 'Off track', color: AppColors.veryBad),
+            _LegendDot(label: 'Not logged', color: AppColors.divider),
+          ],
         ),
       ],
     );
   }
 }
 
-class _WeekdayHeader extends StatelessWidget {
-  const _WeekdayHeader({this.days, this.compact = true});
+class _DayCell extends StatelessWidget {
+  const _DayCell({
+    required this.day,
+    required this.summary,
+    required this.onTap,
+  });
 
-  final List<DateTime>? days;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final labels = days == null
-        ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-        : days!
-              .map((day) => DateFormat(compact ? 'E' : 'EEE').format(day))
-              .toList();
-
-    return Row(
-      children: labels.map((label) {
-        return Expanded(
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-}
-
-class _ReviewDayCell extends StatelessWidget {
-  const _ReviewDayCell({required this.date, required this.summary});
-
-  final DateTime date;
+  final DateTime day;
   final DailySummary? summary;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final today = _dateOnly(DateTime.now());
-    final isToday = _sameDay(date, today);
-    final statusColor = summary == null
-        ? AppColors.textSecondary
-        : _statusColor(summary!.status);
-    final backgroundColor = summary == null
-        ? AppColors.surface
-        : statusColor.withValues(alpha: 0.14);
-    final textColor = summary == null ? AppColors.textSecondary : statusColor;
+    final isToday = day == today;
+    final isFuture = day.isAfter(today);
+    final summary = this.summary;
+    final color = summary == null || !hasSettledStatus(summary)
+        ? null
+        : dayStatusColor(summary.status);
 
     return Material(
-      color: Colors.transparent,
+      color: color?.withValues(alpha: 0.16) ?? AppColors.surfaceVariant,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: isToday
+            ? const BorderSide(color: AppColors.primary, width: 1.5)
+            : BorderSide.none,
+      ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: summary == null
-            ? null
-            : () => _showReviewDaySheet(context, summary!),
-        borderRadius: BorderRadius.circular(16),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isToday ? AppColors.primary : AppColors.divider,
-              width: isToday ? 1.5 : 1,
-            ),
-            boxShadow: isToday
-                ? [
-                    BoxShadow(
-                      color: AppColors.shadow,
-                      blurRadius: 10,
-                      offset: Offset(0, 4),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Center(
-            child: Text(
-              '${date.day}',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: textColor,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ReviewEmptyState extends StatelessWidget {
-  const _ReviewEmptyState();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            Icons.calendar_month_rounded,
-            size: 46,
-            color: AppColors.textSecondary,
-          ),
-          SizedBox(height: 16),
-          Text(
-            'No review data yet',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          SizedBox(height: 10),
-          Text(
-            'Review will fill in once you log meals on at least one day.',
-            textAlign: TextAlign.center,
+        onTap: isFuture ? null : onTap,
+        child: Center(
+          child: Text(
+            '${day.day}',
             style: TextStyle(
               fontSize: 15,
-              color: AppColors.textSecondary,
-              height: 1.4,
+              fontWeight: FontWeight.w700,
+              color: isFuture
+                  ? AppColors.textDisabled
+                  : color ?? AppColors.textSecondary,
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _ReviewErrorState extends StatelessWidget {
-  const _ReviewErrorState();
+class _LegendDot extends StatelessWidget {
+  const _LegendDot({required this.label, required this.color});
+
+  final String label;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        'Could not load review data right now.',
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 15, color: AppColors.textSecondary),
-      ),
-    );
-  }
-}
-
-void _showReviewInfoDialog(BuildContext context) {
-  showDialog<void>(
-    context: context,
-    builder: (context) {
-      return AlertDialog(
-        title: Text('About calendar review'),
-        content: Text(
-          'This screen shows your logged days in a weekly or monthly calendar. '
-          'Each day is colored by how close your calories were to target. '
-          'Tap any colored day to open its details — from there you can also '
-          'add or remove calories to correct a past day (up to '
-          '${DayEditRepository.monthlyLimit} edits per month).',
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Close'),
-          ),
-        ],
-      );
-    },
-  );
-}
-
-void _showReviewDaySheet(BuildContext context, DailySummary summary) {
-  showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    isScrollControlled: true,
-    backgroundColor: AppColors.surface,
-    builder: (context) => _ReviewDaySheet(initialSummary: summary),
-  );
-}
-
-class _ReviewDaySheet extends ConsumerWidget {
-  const _ReviewDaySheet({required this.initialSummary});
-
-  final DailySummary initialSummary;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Watch the live summary so metrics update immediately after an edit,
-    // falling back to the snapshot we were opened with.
-    final summary =
-        ref.watch(dailySummaryForDateProvider(initialSummary.date)).valueOrNull ??
-        initialSummary;
-    final date = DateTime.tryParse(summary.date);
-    final statusColor = _statusColor(summary.status);
-    final editsUsed = ref.watch(dayEditsThisMonthProvider).valueOrNull ?? 0;
-    final editsLeft =
-        (DayEditRepository.monthlyLimit - editsUsed).clamp(
-          0,
-          DayEditRepository.monthlyLimit,
-        );
-
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                date == null
-                    ? summary.date
-                    : DateFormat('EEEE, d MMMM yyyy').format(date),
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  summary.status.label,
-                  style: TextStyle(
-                    color: statusColor,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              SizedBox(height: 20),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  _DetailMetricCard(
-                    label: 'Calories',
-                    value: '${summary.totalCalories}',
-                  ),
-                  _DetailMetricCard(
-                    label: 'Target',
-                    value: '${summary.targetCalories}',
-                  ),
-                  _DetailMetricCard(
-                    label: 'Delta',
-                    value: _deltaLabel(summary.calorieDelta),
-                    valueColor: _deltaColor(summary.calorieDelta),
-                  ),
-                  _DetailMetricCard(
-                    label: 'Meals',
-                    value: '${summary.mealCount}',
-                  ),
-                ],
-              ),
-              SizedBox(height: 24),
-              Text(
-                _statusDescription(summary),
-                style: TextStyle(
-                  fontSize: 15,
-                  color: AppColors.textSecondary,
-                  height: 1.5,
-                ),
-              ),
-              SizedBox(height: 24),
-              _AdjustCaloriesSection(
-                summary: summary,
-                editsLeft: editsLeft,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AdjustCaloriesSection extends ConsumerWidget {
-  const _AdjustCaloriesSection({
-    required this.summary,
-    required this.editsLeft,
-  });
-
-  final DailySummary summary;
-  final int editsLeft;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isSaving = ref.watch(pastDayEditControllerProvider).isLoading;
-    final canEdit = editsLeft > 0;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Adjust calories',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ),
-              Builder(
-                builder: (context) {
-                  final badgeColor = canEdit ? AppColors.bad : AppColors.error;
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: badgeColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: badgeColor.withValues(alpha: 0.5),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          canEdit
-                              ? Icons.info_outline_rounded
-                              : Icons.lock_outline_rounded,
-                          size: 13,
-                          color: badgeColor,
-                        ),
-                        SizedBox(width: 5),
-                        Text(
-                          '$editsLeft left this month',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: badgeColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-          SizedBox(height: 6),
-          Text(
-            'Forgot to log something, or over-counted? Add or remove calories '
-            'for this day. Limited to ${DayEditRepository.monthlyLimit} edits per month.',
-            style: TextStyle(
-              fontSize: 13,
-              color: AppColors.textSecondary,
-              height: 1.4,
-            ),
-          ),
-          SizedBox(height: 14),
-          FilledButton.tonal(
-            onPressed: canEdit && !isSaving
-                ? () => _openAdjustDialog(context, ref)
-                : null,
-            style: FilledButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              backgroundColor: AppColors.surface,
-              minimumSize: const Size.fromHeight(46),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: isSaving
-                ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: AppColors.primary,
-                    ),
-                  )
-                : Text(
-                    canEdit ? 'Adjust calories' : 'No edits left this month',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _openAdjustDialog(BuildContext context, WidgetRef ref) async {
-    final delta = await showDialog<double>(
-      context: context,
-      builder: (_) => _AdjustCaloriesDialog(currentTotal: summary.totalCalories),
-    );
-
-    if (delta == null || delta == 0) return;
-
-    try {
-      await ref.read(pastDayEditControllerProvider.notifier).adjustCalories(
-            date: summary.date,
-            delta: delta,
-          );
-      if (!context.mounted) return;
-      final verb = delta > 0 ? 'Added' : 'Removed';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$verb ${delta.abs().round()} kcal.')),
-      );
-    } on EditLimitExceededException {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No edits left this month.')),
-      );
-    } catch (_) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not adjust calories. Try again.')),
-      );
-    }
-  }
-}
-
-class _AdjustCaloriesDialog extends StatefulWidget {
-  const _AdjustCaloriesDialog({required this.currentTotal});
-
-  final int currentTotal;
-
-  @override
-  State<_AdjustCaloriesDialog> createState() => _AdjustCaloriesDialogState();
-}
-
-class _AdjustCaloriesDialogState extends State<_AdjustCaloriesDialog> {
-  final _controller = TextEditingController();
-  bool _isAdding = true;
-  String? _error;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _confirm() {
-    final amount = int.tryParse(_controller.text.trim());
-    if (amount == null || amount <= 0) {
-      setState(() => _error = 'Enter a calorie amount greater than 0.');
-      return;
-    }
-
-    final delta = (_isAdding ? amount : -amount).toDouble();
-    final newTotal = widget.currentTotal + delta;
-    if (newTotal < 0) {
-      setState(() => _error = 'That would push the day below 0 kcal.');
-      return;
-    }
-
-    Navigator.of(context).pop(delta);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final amount = int.tryParse(_controller.text.trim()) ?? 0;
-    final preview = _isAdding
-        ? widget.currentTotal + amount
-        : widget.currentTotal - amount;
-
-    return AlertDialog(
-      backgroundColor: AppColors.surface,
-      title: Text('Adjust calories'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SegmentedButton<bool>(
-            showSelectedIcon: false,
-            segments: [
-              ButtonSegment(
-                value: true,
-                label: Text('Add'),
-                icon: Icon(Icons.add_rounded, size: 18),
-              ),
-              ButtonSegment(
-                value: false,
-                label: Text('Remove'),
-                icon: Icon(Icons.remove_rounded, size: 18),
-              ),
-            ],
-            selected: {_isAdding},
-            onSelectionChanged: (selection) =>
-                setState(() => _isAdding = selection.first),
-          ),
-          SizedBox(height: 16),
-          TextField(
-            controller: _controller,
-            autofocus: true,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onChanged: (_) => setState(() => _error = null),
-            decoration: InputDecoration(
-              hintText: 'Calories',
-              suffixText: 'kcal',
-              filled: true,
-              fillColor: AppColors.surfaceVariant,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-            ),
-          ),
-          SizedBox(height: 12),
-          Text(
-            'New day total: ${preview < 0 ? widget.currentTotal : preview} kcal',
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-          ),
-          if (_error != null) ...[
-            SizedBox(height: 8),
-            Text(
-              _error!,
-              style: TextStyle(fontSize: 13, color: AppColors.error),
-            ),
-          ],
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _confirm,
-          style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-          child: Text('Apply'),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
         ),
       ],
     );
   }
 }
 
-class _DetailMetricCard extends StatelessWidget {
-  const _DetailMetricCard({
-    required this.label,
-    required this.value,
-    this.valueColor,
+/// The period at a glance: share of days on track, how many days were
+/// logged, the calorie graph and a few plain-language notes.
+class _PeriodReviewCard extends ConsumerWidget {
+  const _PeriodReviewCard({
+    required this.range,
+    required this.days,
+    required this.summariesByDate,
+    required this.isMonth,
   });
 
-  final String label;
-  final String value;
-  final Color? valueColor;
+  final PeriodReviewRange range;
+  final List<DateTime> days;
+  final Map<String, DailySummary> summariesByDate;
+  final bool isMonth;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final review = ref.watch(periodReviewProvider(range)).valueOrNull;
+    if (review == null) {
+      return const AppCard(
+        child: SizedBox(
+          height: 120,
+          child: Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (review.loggedDays == 0)
+                const Text(
+                  'Nothing logged in this period yet.',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: AppColors.textSecondary,
+                  ),
+                )
+              else
+                _ReviewHeadline(review: review),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 80,
+                child: CalorieBars(
+                  days: days,
+                  summariesByDate: summariesByDate,
+                  minimumSlots: isMonth ? 12 : 7,
+                ),
+              ),
+              if (review.loggedDays > 0) ...[
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    StatusPill(
+                      label: '${review.greenDays} on track',
+                      color: AppColors.veryGood,
+                    ),
+                    StatusPill(
+                      label: '${review.yellowDays} close',
+                      color: AppColors.bad,
+                    ),
+                    StatusPill(
+                      label: '${review.redDays} off track',
+                      color: AppColors.veryBad,
+                    ),
+                  ],
+                ),
+                for (final note in review.guidance) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    note,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      height: 1.4,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ],
+          ),
+        ),
+        if (isMonth && review.checkIns.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _CheckInsCard(checkIns: review.checkIns),
+        ],
+      ],
+    );
+  }
+}
+
+class _ReviewHeadline extends StatelessWidget {
+  const _ReviewHeadline({required this.review});
+
+  final PeriodReview review;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 140,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(16),
-      ),
+    final onTrack = (review.calorieConsistencyRate * 100).round();
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$onTrack%',
+                style: const TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const Text(
+                'of logged days on track',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              '${review.loggedDays} of ${review.daysInPeriod} days logged',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Average ${review.averageCaloriesPerDay.round()} kcal a day',
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _CheckInsCard extends StatelessWidget {
+  const _CheckInsCard({required this.checkIns});
+
+  final List<CheckIn> checkIns;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-          ),
-          SizedBox(height: 6),
-          Text(
-            value,
+          const Text(
+            'Check-ins',
             style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: valueColor ?? AppColors.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
             ),
           ),
+          for (final checkIn in checkIns) ...[
+            const SizedBox(height: 12),
+            Text(
+              '${DateFormat('d MMM').format(checkIn.periodEnd)} · '
+              '${checkIn.recommendation.label}',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            if (checkIn.recommendationReason case final reason?) ...[
+              const SizedBox(height: 2),
+              Text(
+                reason,
+                style: const TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ],
         ],
       ),
     );
   }
 }
 
-enum _ReviewMode { week, month }
-
 DateTime _dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
-
-DateTime _firstDayOfMonth(DateTime date) => DateTime(date.year, date.month, 1);
-
-DateTime _lastDayOfMonth(DateTime date) =>
-    DateTime(date.year, date.month + 1, 0);
-
-DateTime _startOfWeek(DateTime date) {
-  final normalized = _dateOnly(date);
-  return normalized.subtract(Duration(days: normalized.weekday - 1));
-}
-
-DateTime _endOfWeek(DateTime date) =>
-    _startOfWeek(date).add(const Duration(days: 6));
-
-DateTime _resolvedFocusedDate(
-  DateTime focusedDate,
-  List<DateTime> activePeriods,
-  _ReviewMode mode,
-) {
-  if (activePeriods.isEmpty) return focusedDate;
-
-  final normalizedFocused = mode == _ReviewMode.month
-      ? _firstDayOfMonth(focusedDate)
-      : _startOfWeek(focusedDate);
-  final currentIndex = _periodIndexOf(activePeriods, normalizedFocused);
-  if (currentIndex != -1) {
-    return activePeriods[currentIndex];
-  }
-
-  return activePeriods.last;
-}
-
-int _periodIndexOf(List<DateTime> periods, DateTime target) {
-  for (var index = 0; index < periods.length; index++) {
-    if (_sameDay(periods[index], target)) {
-      return index;
-    }
-  }
-
-  return -1;
-}
-
-bool _sameDay(DateTime a, DateTime b) {
-  return a.year == b.year && a.month == b.month && a.day == b.day;
-}
-
-String _periodLabel(DateTime focusedDate, _ReviewMode mode) {
-  if (mode == _ReviewMode.month) {
-    return DateFormat('MMMM yyyy').format(focusedDate);
-  }
-
-  final start = _startOfWeek(focusedDate);
-  final end = _endOfWeek(focusedDate);
-  if (start.month == end.month) {
-    return '${DateFormat('d').format(start)} - ${DateFormat('d MMM yyyy').format(end)}';
-  }
-
-  return '${DateFormat('d MMM').format(start)} - ${DateFormat('d MMM yyyy').format(end)}';
-}
 
 String _dateKey(DateTime date) => DateFormat('yyyy-MM-dd').format(date);
 
-Color _statusColor(DailyStatus status) {
-  return switch (status) {
-    DailyStatus.green => AppColors.veryGood,
-    DailyStatus.yellow => AppColors.bad,
-    DailyStatus.red => AppColors.veryBad,
-  };
+DateTime _periodStart(DateTime date, _ReviewMode mode) {
+  final day = _dateOnly(date);
+  return mode == _ReviewMode.month
+      ? DateTime(day.year, day.month, 1)
+      : day.subtract(Duration(days: day.weekday - 1));
 }
 
-String _deltaLabel(int delta) => delta > 0 ? '+$delta' : '$delta';
-
-Color _deltaColor(int delta) {
-  if (delta > 0) return AppColors.error;
-  if (delta < 0) return AppColors.primary;
-  return AppColors.textPrimary;
+DateTime _periodEnd(DateTime date, _ReviewMode mode) {
+  final start = _periodStart(date, mode);
+  return mode == _ReviewMode.month
+      ? DateTime(start.year, start.month + 1, 0)
+      : DateTime(start.year, start.month, start.day + 6);
 }
 
-String _statusDescription(DailySummary summary) {
-  if (summary.status == DailyStatus.green) {
-    return 'Calories landed within 10% of target for this day.';
+DateTime _shift(DateTime start, int by, _ReviewMode mode) {
+  return mode == _ReviewMode.month
+      ? DateTime(start.year, start.month + by, 1)
+      : DateTime(start.year, start.month, start.day + 7 * by);
+}
+
+String _periodLabel(DateTime start, _ReviewMode mode) {
+  if (mode == _ReviewMode.month) {
+    return DateFormat('MMMM yyyy').format(start);
   }
-  if (summary.status == DailyStatus.yellow) {
-    return summary.calorieDelta > 0
-        ? 'Calories finished 10% to 20% above target.'
-        : 'Calories finished 10% to 20% below target.';
-  }
-  return summary.calorieDelta > 0
-      ? 'Calories finished more than 20% above target.'
-      : 'Calories finished more than 20% below target.';
+  final end = _periodEnd(start, mode);
+  final startLabel = start.month == end.month
+      ? DateFormat('d').format(start)
+      : DateFormat('d MMM').format(start);
+  return '$startLabel – ${DateFormat('d MMM yyyy').format(end)}';
 }
