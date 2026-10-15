@@ -52,8 +52,8 @@ $detectorHtml = @'
       width: 100%;
       height: 100%;
       margin: 0;
-      background: #fff;
-      color: #111;
+      background: #F6F4EF;
+      color: #6E6A63;
       font: 600 16px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 

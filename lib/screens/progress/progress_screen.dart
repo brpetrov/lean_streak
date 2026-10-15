@@ -11,6 +11,7 @@ import 'package:lean_streak/models/weight_entry.dart';
 import 'package:lean_streak/providers/user_profile_provider.dart';
 import 'package:lean_streak/providers/weight_entry_provider.dart';
 import 'package:lean_streak/screens/progress/helpers/log_weight_dialog.dart';
+import 'package:lean_streak/widgets/app_card.dart';
 import 'package:lean_streak/widgets/responsive_page.dart';
 
 class ProgressScreen extends ConsumerWidget {
@@ -101,19 +102,7 @@ class _StatsHeader extends StatelessWidget {
     final delta = current - start;
     final target = profile?.targetWeightKg;
 
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+    return AppCard(
       child: Row(
         children: [
           Expanded(
@@ -211,19 +200,8 @@ class _WeightChartCard extends StatelessWidget {
 
     final maxX = spots.last.x == 0 ? 1.0 : spots.last.x;
 
-    return Container(
+    return AppCard(
       padding: const EdgeInsets.fromLTRB(8, 20, 16, 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadow,
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
       child: SizedBox(
         height: 240,
         child: LineChart(
@@ -359,41 +337,39 @@ class _HistorySection extends StatelessWidget {
           ),
         ),
         ...reversed.map(
-          (entry) => Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    DateFormat('EEE, d MMM yyyy').format(entry.date),
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
+          (entry) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: AppCard(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      DateFormat('EEE, d MMM yyyy').format(entry.date),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ),
-                ),
-                if (entry.source == WeightSource.checkIn) ...[
-                  Icon(
-                    Icons.event_available_outlined,
-                    size: 16,
-                    color: AppColors.textSecondary,
+                  if (entry.source == WeightSource.checkIn) ...[
+                    Icon(
+                      Icons.event_available_outlined,
+                      size: 16,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(
+                    '${entry.weightKg.toStringAsFixed(1)} kg',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
-                  const SizedBox(width: 8),
                 ],
-                Text(
-                  '${entry.weightKg.toStringAsFixed(1)} kg',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),

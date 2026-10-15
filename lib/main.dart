@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lean_streak/app/app.dart';
+import 'package:lean_streak/core/constants/app_colors.dart';
 import 'package:lean_streak/firebase_options.dart';
 import 'package:lean_streak/services/notification_service.dart';
 
@@ -54,7 +55,7 @@ class _StartupErrorApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.background,
         body: SafeArea(
           child: Center(
             child: ConstrainedBox(
@@ -69,7 +70,7 @@ class _StartupErrorApp extends StatelessWidget {
                       'LeanStreak could not start',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: Color(0xFF111111),
+                        color: AppColors.textPrimary,
                         fontSize: 22,
                         fontWeight: FontWeight.w700,
                       ),
@@ -79,7 +80,7 @@ class _StartupErrorApp extends StatelessWidget {
                       'Please refresh the page. If it keeps happening, send this message back to the developer.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: Color(0xFF666666),
+                        color: AppColors.textSecondary,
                         fontSize: 15,
                         height: 1.4,
                       ),
@@ -89,7 +90,7 @@ class _StartupErrorApp extends StatelessWidget {
                       message,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                        color: Color(0xFF444444),
+                        color: AppColors.textSecondary,
                         fontSize: 12,
                         height: 1.4,
                       ),

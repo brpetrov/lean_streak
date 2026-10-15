@@ -6,7 +6,6 @@ import 'package:lean_streak/app/router.dart';
 import 'package:lean_streak/core/constants/app_colors.dart';
 import 'package:lean_streak/providers/account_controller.dart';
 import 'package:lean_streak/providers/auth_controller.dart';
-import 'package:lean_streak/providers/theme_controller.dart';
 import 'package:lean_streak/widgets/app_logo_mark.dart';
 import 'package:lean_streak/widgets/password_confirm_dialog.dart';
 
@@ -87,8 +86,6 @@ class _AppDrawer extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isWorking = authState.isLoading || accountState.isLoading;
-    final themeMode = ref.watch(themeControllerProvider).valueOrNull;
-    final isDarkMode = themeMode == ThemeMode.dark;
 
     return Drawer(
       child: SafeArea(
@@ -136,20 +133,6 @@ class _AppDrawer extends ConsumerWidget {
                 Navigator.of(context).pop();
                 context.push(AppRoutes.profile);
               },
-            ),
-            SwitchListTile(
-              secondary: Icon(
-                isDarkMode ? Icons.dark_mode_rounded : Icons.dark_mode_outlined,
-              ),
-              title: Text('Dark theme'),
-              value: isDarkMode,
-              onChanged: themeMode == null
-                  ? null
-                  : (value) {
-                      ref
-                          .read(themeControllerProvider.notifier)
-                          .setDarkMode(value);
-                    },
             ),
             const ListTile(
               enabled: false,

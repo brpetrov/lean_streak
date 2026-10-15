@@ -142,4 +142,9 @@ _flutter.loader.load({
     canvasKitBaseUrl: 'canvaskit/',
     canvasKitVariant: 'full',
   },
+  onEntrypointLoaded: async function (engineInitializer) {
+    const appRunner = await engineInitializer.initializeEngine();
+    document.getElementById('loading')?.remove();
+    await appRunner.runApp();
+  },
 });

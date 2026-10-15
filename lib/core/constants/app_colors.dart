@@ -1,56 +1,36 @@
 import 'package:flutter/material.dart';
 
+/// Light-only "warm paper" palette: off-white page, cream cards with a thin
+/// warm edge, and the logo teal as the accent.
 class AppColors {
   AppColors._();
 
-  static bool isDark = false;
+  static const Color primary = Color(0xFF2E7D6E);
+  static const Color onPrimary = Color(0xFFFFFFFF);
+  static const Color primaryContainer = Color(0xFFE1EFEC);
 
-  static Color get primary =>
-      isDark ? const Color(0xFFF7F7F7) : const Color(0xFF111111);
-  static Color get primaryDark =>
-      isDark ? const Color(0xFFFFFFFF) : const Color(0xFF000000);
-  static Color get primaryLight =>
-      isDark ? const Color(0xFFD4D4D8) : const Color(0xFF444444);
+  static const Color background = Color(0xFFF6F4EF);
+  static const Color surface = Color(0xFFFDFCF9);
+  static const Color surfaceVariant = Color(0xFFF0EDE6);
 
-  static Color get background =>
-      isDark ? const Color(0xFF09090B) : const Color(0xFFFFFFFF);
-  static Color get surface =>
-      isDark ? const Color(0xFF18181B) : const Color(0xFFFFFFFF);
-  static Color get surfaceVariant =>
-      isDark ? const Color(0xFF27272A) : const Color(0xFFF2F3F5);
+  static const Color textPrimary = Color(0xFF1F1D1A);
+  static const Color textSecondary = Color(0xFF6E6A63);
+  static const Color textDisabled = Color(0xFFA8A39A);
 
-  static Color get textPrimary =>
-      isDark ? const Color(0xFFF7F7F7) : const Color(0xFF111111);
-  static Color get textSecondary =>
-      isDark ? const Color(0xFFA1A1AA) : const Color(0xFF666666);
-  static Color get textDisabled =>
-      isDark ? const Color(0xFF71717A) : const Color(0xFFA8A8A8);
+  static const Color veryGood = Color(0xFF2E7D6E);
+  static const Color bad = Color(0xFFE8A75B);
+  static const Color veryBad = Color(0xFFD64045);
 
-  static Color get veryGood =>
-      isDark ? const Color(0xFF55BFA8) : const Color(0xFF2E7D6E);
-  static Color get good =>
-      isDark ? const Color(0xFF8AD5B0) : const Color(0xFF78B89A);
-  static Color get bad =>
-      isDark ? const Color(0xFFF0B768) : const Color(0xFFE8A75B);
-  static Color get veryBad =>
-      isDark ? const Color(0xFFFF6B70) : const Color(0xFFD64045);
+  static const Color tagPositive = veryGood;
+  static const Color tagPositiveBg = Color(0xFFE3F2EF);
 
-  static Color get tagPositive => veryGood;
-  static Color get tagPositiveBg =>
-      isDark ? const Color(0xFF143A34) : const Color(0xFFE3F2EF);
+  static const Color tagNeutral = textSecondary;
+  static const Color tagNeutralBg = Color(0xFFEFF3F1);
 
-  static Color get tagNeutral => textSecondary;
-  static Color get tagNeutralBg =>
-      isDark ? const Color(0xFF27272A) : const Color(0xFFEFF3F1);
+  static const Color tagWarning = bad;
+  static const Color tagWarningBg = Color(0xFFFDF3E7);
 
-  static Color get tagWarning => bad;
-  static Color get tagWarningBg =>
-      isDark ? const Color(0xFF3F2E15) : const Color(0xFFFDF3E7);
-
-  static Color get divider =>
-      isDark ? const Color(0xFF2F2F34) : const Color(0xFFE4E4E7);
-  static Color get error =>
-      isDark ? const Color(0xFFFF6B70) : const Color(0xFFD64045);
-  static Color get shadow =>
-      isDark ? const Color(0x66000000) : const Color(0x0F111111);
+  static const Color divider = Color(0xFFE8E4DC);
+  static const Color error = Color(0xFFD64045);
+  static const Color shadow = Color(0x0A1F1D1A);
 }
