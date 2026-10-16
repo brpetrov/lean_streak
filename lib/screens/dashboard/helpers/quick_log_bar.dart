@@ -391,8 +391,18 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
                                 vertical: 15,
                                 horizontal: 20,
                               ),
-                              suffixIcon: hasText || _working || _listening
+                              // Camera while empty; a clear button once
+                              // there is text, so a wrong voice or AI
+                              // result is one tap from gone.
+                              suffixIcon: _working || _listening
                                   ? null
+                                  : hasText
+                                  ? IconButton(
+                                      tooltip: 'Clear',
+                                      onPressed: _reset,
+                                      color: AppColors.textSecondary,
+                                      icon: const Icon(Icons.close_rounded),
+                                    )
                                   : IconButton(
                                       tooltip: 'Photo',
                                       onPressed: _pickPhoto,

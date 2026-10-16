@@ -174,15 +174,22 @@ void main() {
     expect(find.text('400 kcal · 30 g'), findsOneWidget);
   });
 
-  testWidgets('the camera button shows only while the box is empty', (
+  testWidgets('the box offers the camera when empty and clear when not', (
     tester,
   ) async {
     await pumpCard(tester);
     expect(find.byTooltip('Photo'), findsOneWidget);
+    expect(find.byTooltip('Clear'), findsNothing);
 
     await tester.enterText(find.byType(TextField), 'wrap');
     await tester.pump();
     expect(find.byTooltip('Photo'), findsNothing);
+    expect(find.byTooltip('Clear'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Clear'));
+    await tester.pump();
+    expect(boxText(tester), isEmpty);
+    expect(find.byTooltip('Photo'), findsOneWidget);
   });
 
   testWidgets('offers recent meals while the box is focused', (tester) async {
