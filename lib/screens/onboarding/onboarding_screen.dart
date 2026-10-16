@@ -421,7 +421,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                             height: 22,
                             child: CircularProgressIndicator(
                               strokeWidth: 2.5,
-                              color: Colors.white,
+                              color: AppColors.onPrimary,
                             ),
                           )
                         : Text(

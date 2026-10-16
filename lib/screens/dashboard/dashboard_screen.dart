@@ -330,7 +330,7 @@ class _TodayCard extends StatelessWidget {
                       remaining >= 0
                           ? '$remaining kcal left'
                           : '${remaining.abs()} kcal over',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.5,
@@ -340,7 +340,7 @@ class _TodayCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       '${summary.totalCalories} of ${summary.targetCalories} kcal eaten',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
                         color: AppColors.textSecondary,
                       ),
@@ -357,7 +357,7 @@ class _TodayCard extends StatelessWidget {
           const SizedBox(height: 20),
           Row(
             children: [
-              const Text(
+              Text(
                 'Daily protein',
                 style: TextStyle(
                   fontSize: 14,
@@ -368,7 +368,7 @@ class _TodayCard extends StatelessWidget {
               const Spacer(),
               Text(
                 '$proteinLogged / $proteinTarget g',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
@@ -386,7 +386,7 @@ class _TodayCard extends StatelessWidget {
             Text(
               '$mealsWithoutProtein ${mealsWithoutProtein == 1 ? 'meal' : 'meals'} '
               'not counted (no protein info)',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,
               ),
@@ -441,7 +441,7 @@ class _MealsCard extends StatelessWidget {
             padding: const EdgeInsets.only(right: 12, bottom: 4),
             child: Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Today\'s meals',
                     style: TextStyle(
@@ -454,7 +454,7 @@ class _MealsCard extends StatelessWidget {
                 if (meals.isNotEmpty)
                   Text(
                     '${meals.length} logged',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       color: AppColors.textSecondary,
                     ),
@@ -463,7 +463,7 @@ class _MealsCard extends StatelessWidget {
             ),
           ),
           if (meals.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(top: 4, bottom: 10, right: 12),
               child: Text(
                 'Nothing logged yet. Type or tap the mic below.',
@@ -508,14 +508,14 @@ class _MonthPreviewCard extends ConsumerWidget {
               Expanded(
                 child: Text(
                   DateFormat('MMMM').format(date),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
                   ),
                 ),
               ),
-              const Text(
+              Text(
                 'Review',
                 style: TextStyle(
                   fontSize: 14,
@@ -523,7 +523,7 @@ class _MonthPreviewCard extends ConsumerWidget {
                   color: AppColors.primary,
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 size: 20,
                 color: AppColors.primary,
@@ -569,7 +569,7 @@ class _MonthPreviewCard extends ConsumerWidget {
                           summaries.isEmpty
                               ? 'No logged days yet this month.'
                               : '${summaries.length} days logged',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
                             color: AppColors.textSecondary,
                           ),
@@ -594,13 +594,13 @@ class _MonthPreviewCard extends ConsumerWidget {
                 ],
               );
             },
-            loading: () => const SizedBox(
+            loading: () => SizedBox(
               height: 112,
               child: Center(
                 child: CircularProgressIndicator(color: AppColors.primary),
               ),
             ),
-            error: (_, _) => const SizedBox(
+            error: (_, _) => SizedBox(
               height: 112,
               child: Center(
                 child: Text(
@@ -641,13 +641,13 @@ class _WeightCard extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(18, 10, 10, 10),
       child: Row(
         children: [
-          const Icon(Icons.monitor_weight_outlined, color: AppColors.primary),
+          Icon(Icons.monitor_weight_outlined, color: AppColors.primary),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Weight',
                   style: TextStyle(
                     fontSize: 16,
@@ -663,7 +663,7 @@ class _WeightCard extends ConsumerWidget {
                       ? 'Latest: ${latest.weightKg.toStringAsFixed(1)} kg'
                             ' · $daysAgo days ago'
                       : 'Latest: ${latest.weightKg.toStringAsFixed(1)} kg',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
                   ),

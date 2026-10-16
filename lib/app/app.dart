@@ -7,6 +7,7 @@ import 'package:lean_streak/core/constants/app_colors.dart';
 import 'package:lean_streak/core/theme/app_theme.dart';
 import 'package:lean_streak/providers/activity_scale_migration_provider.dart';
 import 'package:lean_streak/providers/reminder_provider.dart';
+import 'package:lean_streak/providers/theme_controller.dart';
 
 class LeanStreakApp extends ConsumerWidget {
   const LeanStreakApp({super.key});
@@ -16,9 +17,28 @@ class LeanStreakApp extends ConsumerWidget {
     ref.watch(activityScaleMigrationProvider);
     ref.watch(reminderSyncProvider);
     final router = ref.watch(goRouterProvider);
+    final mode = ref.watch(themeControllerProvider);
+    // The AppColors getters must agree with the Material theme, so the flag
+    // is set here, before any route builds.
+    AppColors.isDark =
+        ref.watch(effectiveBrightnessProvider) == Brightness.dark;
+    // Most of the tree is built with `const`, which a normal rebuild skips,
+    // so a switch marks every element dirty (state is kept, as on hot reload).
+    // This listener runs mid-build, so the reassemble waits for the frame.
+    ref.listen(effectiveBrightnessProvider, (_, next) {
+      AppColors.isDark = next == Brightness.dark;
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => WidgetsBinding.instance.reassembleApplication(),
+      );
+    });
     return MaterialApp.router(
       title: 'LeanStreak',
       theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: mode,
+      // Lerping the theme while the getters have already flipped would show
+      // a frame of mismatched colours.
+      themeAnimationDuration: Duration.zero,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
       builder: appShellBuilder,
@@ -42,7 +62,7 @@ Widget appShellBuilder(BuildContext context, Widget? child) {
     child: Center(
       child: Container(
         width: appMaxWidth,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.background,
           border: Border.symmetric(
             vertical: BorderSide(color: AppColors.divider),

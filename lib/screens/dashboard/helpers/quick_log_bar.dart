@@ -226,7 +226,7 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
     return Material(
       color: AppColors.surface,
       child: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           border: Border(top: BorderSide(color: AppColors.divider)),
         ),
         child: SafeArea(
@@ -258,7 +258,7 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
                               _error = null;
                             }),
                             onSubmitted: (_) => _submit(),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
                               color: AppColors.textPrimary,
                             ),
@@ -274,7 +274,7 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(26),
-                                borderSide: const BorderSide(
+                                borderSide: BorderSide(
                                   color: AppColors.primary,
                                   width: 1.5,
                                 ),
@@ -373,7 +373,7 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
                   const SizedBox(height: 2),
                   Text(
                     _aiNote!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       color: AppColors.textSecondary,
                     ),

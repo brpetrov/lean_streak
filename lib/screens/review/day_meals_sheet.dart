@@ -112,7 +112,7 @@ class _DayMealsSheetState extends ConsumerState<DayMealsSheet> {
                       children: [
                         Text(
                           DateFormat('EEEE, d MMMM').format(widget.date),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary,
@@ -124,7 +124,7 @@ class _DayMealsSheetState extends ConsumerState<DayMealsSheet> {
                               ? 'Nothing logged'
                               : '${summary.totalCalories} of '
                                     '${summary.targetCalories} kcal',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             color: AppColors.textSecondary,
                           ),
@@ -145,7 +145,7 @@ class _DayMealsSheetState extends ConsumerState<DayMealsSheet> {
               Text(
                 '${changesLeft.clamp(0, DayEditRepository.monthlyLimit)} of '
                 '${DayEditRepository.monthlyLimit} past-day changes left this month',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   color: AppColors.textSecondary,
                 ),
@@ -153,14 +153,14 @@ class _DayMealsSheetState extends ConsumerState<DayMealsSheet> {
             ],
             const SizedBox(height: 12),
             if (meals == null)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.all(24),
                 child: Center(
                   child: CircularProgressIndicator(color: AppColors.primary),
                 ),
               )
             else if (meals.isEmpty)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(vertical: 12),
                 child: Text(
                   'No meals logged on this day.',
@@ -195,7 +195,7 @@ class _DayMealsSheetState extends ConsumerState<DayMealsSheet> {
               const SizedBox(height: 8),
               Text(
                 _error!,
-                style: const TextStyle(fontSize: 14, color: AppColors.error),
+                style: TextStyle(fontSize: 14, color: AppColors.error),
               ),
             ],
             const SizedBox(height: 16),

@@ -34,7 +34,7 @@ class MealRow extends StatelessWidget {
               children: [
                 Text(
                   name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
@@ -43,7 +43,7 @@ class MealRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   DateFormat('HH:mm').format(meal.timestamp),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
                   ),
@@ -56,7 +56,7 @@ class MealRow extends StatelessWidget {
             children: [
               Text(
                 '${meal.calories.round()} kcal',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
@@ -66,7 +66,7 @@ class MealRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   '${meal.proteinGrams!.round()} g protein',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
                   ),

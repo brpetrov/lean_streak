@@ -442,7 +442,7 @@ class _PlanSettingsScreenState extends ConsumerState<PlanSettingsScreen> {
                                   height: 22,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2.5,
-                                    color: Colors.white,
+                                    color: AppColors.onPrimary,
                                   ),
                                 )
                               : Text(
@@ -546,7 +546,7 @@ class _BmiCard extends StatelessWidget {
 
   _BmiCategory get _category {
     if (bmi < 18.5) {
-      return const _BmiCategory(label: 'Underweight', color: Color(0xFF3B82F6));
+      return _BmiCategory(label: 'Underweight', color: AppColors.info);
     }
     if (bmi < 25) {
       return _BmiCategory(label: 'Healthy range', color: AppColors.veryGood);
@@ -643,7 +643,7 @@ class _BmiGradientLine extends StatelessWidget {
                     borderRadius: BorderRadius.circular(999),
                     gradient: LinearGradient(
                       colors: [
-                        Color(0xFF3B82F6),
+                        AppColors.info,
                         AppColors.veryGood,
                         AppColors.bad,
                         AppColors.veryBad,

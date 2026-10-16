@@ -37,10 +37,10 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
       appBar: AppBar(title: const Text('Review')),
       body: periodsAsync.when(
         data: _buildContent,
-        loading: () => const Center(
+        loading: () => Center(
           child: CircularProgressIndicator(color: AppColors.primary),
         ),
-        error: (_, _) => const Center(
+        error: (_, _) => Center(
           child: Text(
             'Could not load your review right now.',
             style: TextStyle(color: AppColors.textSecondary),
@@ -125,7 +125,7 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
               ),
               const SizedBox(height: 12),
               if (reviewEnd.isBefore(start))
-                const AppCard(
+                AppCard(
                   child: Text(
                     'The review fills in once a day in this period is over.',
                     style: TextStyle(
@@ -187,7 +187,7 @@ class _PeriodBar extends StatelessWidget {
             child: Text(
               label,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
@@ -258,7 +258,7 @@ class _Calendar extends StatelessWidget {
                 child: Text(
                   label,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textSecondary,
@@ -296,7 +296,7 @@ class _Calendar extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        const Wrap(
+        Wrap(
           alignment: WrapAlignment.center,
           spacing: 14,
           runSpacing: 6,
@@ -338,7 +338,7 @@ class _DayCell extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: isToday
-            ? const BorderSide(color: AppColors.primary, width: 1.5)
+            ? BorderSide(color: AppColors.primary, width: 1.5)
             : BorderSide.none,
       ),
       clipBehavior: Clip.antiAlias,
@@ -380,7 +380,7 @@ class _LegendDot extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           label,
-          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
         ),
       ],
     );
@@ -406,7 +406,7 @@ class _PeriodReviewCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final review = ref.watch(periodReviewProvider(range)).valueOrNull;
     if (review == null) {
-      return const AppCard(
+      return AppCard(
         child: SizedBox(
           height: 120,
           child: Center(
@@ -424,7 +424,7 @@ class _PeriodReviewCard extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (review.loggedDays == 0)
-                const Text(
+                Text(
                   'Nothing logged in this period yet.',
                   style: TextStyle(
                     fontSize: 15,
@@ -466,7 +466,7 @@ class _PeriodReviewCard extends ConsumerWidget {
                   const SizedBox(height: 10),
                   Text(
                     note,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       height: 1.4,
                       color: AppColors.textSecondary,
@@ -500,14 +500,14 @@ class _ReviewHeadline extends StatelessWidget {
             children: [
               Text(
                 '$onTrack%',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 30,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.5,
                   color: AppColors.textPrimary,
                 ),
               ),
-              const Text(
+              Text(
                 'of logged days on track',
                 style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
               ),
@@ -519,7 +519,7 @@ class _ReviewHeadline extends StatelessWidget {
           children: [
             Text(
               '${review.loggedDays} of ${review.daysInPeriod} days logged',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
@@ -528,7 +528,7 @@ class _ReviewHeadline extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               'Average ${review.averageCaloriesPerDay.round()} kcal a day',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 color: AppColors.textSecondary,
               ),

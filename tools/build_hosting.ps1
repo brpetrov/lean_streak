@@ -62,6 +62,14 @@ $detectorHtml = @'
       align-items: center;
       justify-content: center;
     }
+
+    @media (prefers-color-scheme: dark) {
+      html,
+      body {
+        background: #171513;
+        color: #B3ACA3;
+      }
+    }
   </style>
 </head>
 <body>

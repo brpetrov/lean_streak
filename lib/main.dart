@@ -42,6 +42,9 @@ void main() async {
   } catch (error, stackTrace) {
     debugPrint('LeanStreak startup failed: $error');
     debugPrint(stackTrace.toString());
+    AppColors.isDark =
+        WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+        Brightness.dark;
     runApp(_StartupErrorApp(message: error.toString()));
     return;
   }
@@ -81,7 +84,7 @@ class _StartupErrorApp extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
+                    Text(
                       'LeanStreak could not start',
                       textAlign: TextAlign.center,
                       style: TextStyle(
@@ -91,7 +94,7 @@ class _StartupErrorApp extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(
                       'Please refresh the page. If it keeps happening, send this message back to the developer.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
@@ -104,7 +107,7 @@ class _StartupErrorApp extends StatelessWidget {
                     SelectableText(
                       message,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 12,
                         height: 1.4,

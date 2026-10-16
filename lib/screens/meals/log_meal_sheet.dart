@@ -179,7 +179,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
           children: [
             Text(
               _isEditing ? 'Edit meal' : 'Add meal',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
@@ -189,7 +189,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
               const SizedBox(height: 2),
               Text(
                 dateLabel,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   color: AppColors.textSecondary,
                 ),
@@ -238,7 +238,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
               ],
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'Leave protein blank and it is estimated from the meal name.',
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
@@ -262,7 +262,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
             if (_estimateNote != null)
               Text(
                 _estimateNote!,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   color: AppColors.textSecondary,
                 ),
@@ -271,14 +271,14 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
               const SizedBox(height: 8),
               Text(
                 _error!,
-                style: const TextStyle(fontSize: 14, color: AppColors.error),
+                style: TextStyle(fontSize: 14, color: AppColors.error),
               ),
             ],
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: saving || _estimating ? null : _submit,
               child: saving
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 22,
                       height: 22,
                       child: CircularProgressIndicator(

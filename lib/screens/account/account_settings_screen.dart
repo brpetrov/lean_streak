@@ -324,7 +324,7 @@ class _SmallButtonSpinner extends StatelessWidget {
     return SizedBox(
       width: 22,
       height: 22,
-      child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+      child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.onPrimary),
     );
   }
 }
