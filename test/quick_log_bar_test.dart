@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -29,15 +31,27 @@ class _FakeEstimateService implements CalorieEstimateService {
   @override
   Future<CalorieEstimate> estimate(String uid, String description) async {
     estimateCalls++;
-    return (kcal: 520, protein: 32, note: 'Typical wrap.');
+    return (
+      kcal: 520,
+      protein: 32,
+      note: 'Typical wrap.',
+      items: const [
+        (name: 'Chicken wrap', kcal: 400, protein: 30),
+        (name: 'Mayo', kcal: 120, protein: 2),
+      ],
+    );
   }
 
   @override
   Future<VoiceMealParsed> parseVoice(String transcript) async =>
-      (name: 'Lunch', kcal: 400, protein: null);
+      (name: 'Lunch', kcal: 400, protein: null, items: const <EstimateItem>[]);
 
   @override
   Future<int?> estimateProtein(String name, int kcal) async => 30;
+
+  @override
+  Future<VoiceMealParsed> estimateFromPhoto(String uid, Uint8List jpeg) =>
+      throw UnimplementedError();
 }
 
 void main() {
@@ -94,9 +108,27 @@ void main() {
 
     expect(boxText(tester), 'chicken wrap 520 kcal 32g protein');
     expect(find.text('Chicken wrap · 520 kcal · 32 g protein'), findsOneWidget);
-    expect(find.text('Typical wrap.'), findsOneWidget);
     expect(find.byTooltip('Save'), findsOneWidget);
     expect(controller.saved, isEmpty);
+
+    // The breakdown is one muted line until tapped.
+    expect(find.text('Chicken wrap 400 · Mayo 120'), findsOneWidget);
+    expect(find.text('120 kcal · 2 g'), findsNothing);
+    await tester.tap(find.text('Chicken wrap 400 · Mayo 120'));
+    await tester.pump();
+    expect(find.text('120 kcal · 2 g'), findsOneWidget);
+    expect(find.text('400 kcal · 30 g'), findsOneWidget);
+  });
+
+  testWidgets('the camera button shows only while the box is empty', (
+    tester,
+  ) async {
+    await pumpCard(tester);
+    expect(find.byTooltip('Photo'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'wrap');
+    await tester.pump();
+    expect(find.byTooltip('Photo'), findsNothing);
   });
 
   testWidgets('keyboard done saves when calories are present', (tester) async {

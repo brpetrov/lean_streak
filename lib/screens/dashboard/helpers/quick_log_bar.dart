@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
@@ -11,10 +12,12 @@ import 'package:lean_streak/providers/auth_provider.dart';
 import 'package:lean_streak/providers/log_meal_controller.dart';
 import 'package:lean_streak/screens/meals/log_meal_sheet.dart';
 import 'package:lean_streak/services/calorie_estimate_service.dart';
+import 'package:lean_streak/widgets/estimate_breakdown.dart';
 
 /// The log composer pinned to the bottom of Today, under the thumb.
 /// "chicken wrap 450" saves straight away; a meal without calories can be
-/// estimated by the AI. With the box empty the main button is the mic.
+/// estimated by the AI, or a photo taken. With the box empty the main
+/// button is the mic.
 class QuickLogBar extends ConsumerStatefulWidget {
   const QuickLogBar({super.key});
 
@@ -30,7 +33,7 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
   bool _speechAvailable = false;
   bool _listening = false;
   bool _working = false;
-  String? _aiNote;
+  List<EstimateItem> _aiItems = const [];
   String? _error;
 
   QuickLogEntry get _entry => parseQuickLog(_controller.text);
@@ -39,8 +42,9 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
   // (including desktop browsers, which have no on-screen keyboard) focuses
   // the box on open.
   bool get _isDesktop => switch (defaultTargetPlatform) {
-    TargetPlatform.windows || TargetPlatform.macOS || TargetPlatform.linux =>
-      true,
+    TargetPlatform.windows ||
+    TargetPlatform.macOS ||
+    TargetPlatform.linux => true,
     _ => false,
   };
 
@@ -61,7 +65,7 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
   void _reset() {
     _controller.clear();
     setState(() {
-      _aiNote = null;
+      _aiItems = const [];
       _error = null;
     });
   }
@@ -107,7 +111,7 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
           .estimate(uid, text);
       if (!mounted) return;
       _setText('$text ${_amounts(result.kcal, result.protein)}');
-      _aiNote = result.note;
+      _aiItems = result.items;
     });
   }
 
@@ -162,7 +166,7 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
     _setText('');
     setState(() {
       _listening = true;
-      _aiNote = null;
+      _aiItems = const [];
       _error = null;
     });
 
@@ -193,6 +197,37 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
           .parseVoice(transcript);
       if (!mounted) return;
       _setText('${result.name} ${_amounts(result.kcal, result.protein)}');
+      _aiItems = result.items;
+    });
+  }
+
+  bool get _isMobile =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
+
+  /// Camera on phones, a file picker elsewhere. The picker resizes the photo
+  /// so the upload stays small (and the AI bill tiny).
+  Future<void> _pickPhoto() async {
+    final uid = ref.read(currentUidProvider);
+    if (uid == null) return;
+    final file = await ImagePicker().pickImage(
+      source: _isMobile ? ImageSource.camera : ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 80,
+    );
+    if (file == null || !mounted) return;
+    final bytes = await file.readAsBytes();
+    if (!mounted) return;
+
+    await _runAi(() async {
+      final result = await ref
+          .read(calorieEstimateServiceProvider)
+          .estimateFromPhoto(uid, bytes);
+      if (!mounted) return;
+      _setText('${result.name} ${_amounts(result.kcal, result.protein)}');
+      _aiItems = result.items;
     });
   }
 
@@ -254,7 +289,7 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
                             textCapitalization: TextCapitalization.sentences,
                             textInputAction: TextInputAction.done,
                             onChanged: (_) => setState(() {
-                              _aiNote = null;
+                              _aiItems = const [];
                               _error = null;
                             }),
                             onSubmitted: (_) => _submit(),
@@ -283,6 +318,16 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
                                 vertical: 15,
                                 horizontal: 20,
                               ),
+                              suffixIcon: hasText || _working || _listening
+                                  ? null
+                                  : IconButton(
+                                      tooltip: 'Photo',
+                                      onPressed: _pickPhoto,
+                                      color: AppColors.textSecondary,
+                                      icon: const Icon(
+                                        Icons.photo_camera_outlined,
+                                      ),
+                                    ),
                             ),
                           ),
                         ),
@@ -303,8 +348,7 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
   /// One thumb-sized button that changes with the box: mic when empty,
   /// save or estimate once there is text, stop while listening.
   Widget _buildAction(QuickLogEntry entry, bool hasText) {
-    final (IconData icon, String tooltip, VoidCallback? onPressed) =
-        _listening
+    final (IconData icon, String tooltip, VoidCallback? onPressed) = _listening
         ? (Icons.stop_rounded, 'Stop', _toggleListening)
         : _working
         ? (Icons.more_horiz_rounded, 'Working', null)
@@ -369,22 +413,19 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
                     fontWeight: emphasise ? FontWeight.w600 : FontWeight.w400,
                   ),
                 ),
-                if (_aiNote != null && !_working) ...[
+                if (_aiItems.isNotEmpty && !_working) ...[
                   const SizedBox(height: 2),
-                  Text(
-                    _aiNote!,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
+                  EstimateBreakdown(items: _aiItems),
                 ],
               ],
             ),
           ),
         ),
         if (hasText && !_working && !_listening)
-          TextButton(onPressed: _openDetails, child: const Text('More details')),
+          TextButton(
+            onPressed: _openDetails,
+            child: const Text('More details'),
+          ),
       ],
     );
   }

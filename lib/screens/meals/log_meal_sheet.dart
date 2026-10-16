@@ -10,6 +10,7 @@ import 'package:lean_streak/providers/auth_provider.dart';
 import 'package:lean_streak/providers/log_meal_controller.dart';
 import 'package:lean_streak/providers/past_day_edit_provider.dart';
 import 'package:lean_streak/services/calorie_estimate_service.dart';
+import 'package:lean_streak/widgets/estimate_breakdown.dart';
 
 /// Opens the meal form: edits [existingMeal], or adds a meal on [date]
 /// (yyyy-MM-dd, today by default). Resolves to true when the meal was saved.
@@ -61,7 +62,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
   final _proteinController = TextEditingController();
 
   bool _estimating = false;
-  String? _estimateNote;
+  List<EstimateItem> _estimateItems = const [];
   String? _error;
 
   bool get _isEditing => widget.existingMeal != null;
@@ -97,7 +98,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
 
     setState(() {
       _estimating = true;
-      _estimateNote = null;
+      _estimateItems = const [];
       _error = null;
     });
 
@@ -110,7 +111,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
       if (result.protein != null) {
         _proteinController.text = '${result.protein}';
       }
-      _estimateNote = result.note;
+      _estimateItems = result.items;
     } on DailyLimitExceededException {
       _error = 'Daily AI limit reached. Enter the calories yourself.';
     } on CalorieEstimateException catch (error) {
@@ -189,10 +190,7 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
               const SizedBox(height: 2),
               Text(
                 dateLabel,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                ),
+                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
               ),
             ],
             const SizedBox(height: 20),
@@ -259,14 +257,8 @@ class _LogMealSheetState extends ConsumerState<_LogMealSheet> {
                 label: const Text('Estimate from name'),
               ),
             ),
-            if (_estimateNote != null)
-              Text(
-                _estimateNote!,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                ),
-              ),
+            if (_estimateItems.isNotEmpty)
+              EstimateBreakdown(items: _estimateItems),
             if (_error != null) ...[
               const SizedBox(height: 8),
               Text(

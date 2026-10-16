@@ -8,8 +8,39 @@ import 'package:intl/intl.dart';
 import 'package:lean_streak/core/config/api_keys.dart';
 import 'package:lean_streak/repositories/ai_usage_repository.dart';
 
-typedef CalorieEstimate = ({int kcal, int? protein, String note});
-typedef VoiceMealParsed = ({String name, int kcal, int? protein});
+/// One component of a meal as the model broke it down.
+typedef EstimateItem = ({String name, int kcal, int? protein});
+typedef CalorieEstimate = ({
+  int kcal,
+  int? protein,
+  String note,
+  List<EstimateItem> items,
+});
+
+/// A meal recognised from a voice note or a photo.
+typedef VoiceMealParsed = ({
+  String name,
+  int kcal,
+  int? protein,
+  List<EstimateItem> items,
+});
+
+/// Reads the model's `items` list, skipping anything malformed.
+List<EstimateItem> parseEstimateItems(Object? raw) {
+  if (raw is! List) return const [];
+  return [
+    for (final entry in raw)
+      if (entry is Map &&
+          entry['item'] is String &&
+          (entry['item'] as String).trim().isNotEmpty &&
+          entry['kcal'] is num)
+        (
+          name: (entry['item'] as String).trim(),
+          kcal: (entry['kcal'] as num).round(),
+          protein: (entry['protein_g'] as num?)?.round(),
+        ),
+  ];
+}
 
 class DailyLimitExceededException implements Exception {
   const DailyLimitExceededException();
@@ -83,6 +114,19 @@ class CalorieEstimateService {
       'Do not include any other text.\n\n'
       'Transcript: {input}';
 
+  static const String _photoPromptTemplate =
+      '$_context'
+      'The user sent a photo of a meal. Identify the dishes and estimate the '
+      'portions from what is visible. List every component with its calories '
+      'and protein, including visible oil, sauces, bread and drinks, then add '
+      'them up. Use UK nutrition figures for branded or chain products. If the '
+      'photo shows no food, respond with {"error": "no food"}.\n'
+      'Respond with ONLY a JSON object: {"name": "<short meal name>", '
+      '"items": [{"item": "<component>", "kcal": <integer>, "protein_g": '
+      '<integer>}], "kcal": <integer total>, "protein_g": <integer total>, '
+      '"note": "<one short sentence explaining the estimate>"}\n'
+      'Do not include any other text.';
+
   static const String _proteinPromptTemplate =
       '$_context'
       'The user logged a meal by name with its calories. Assuming the '
@@ -105,25 +149,20 @@ class CalorieEstimateService {
         '{input}',
         description.trim(),
       );
-      final response = await _generateWithRetries(_model, prompt);
-      final raw = response.text?.trim() ?? '';
-
-      if (raw.isEmpty) {
-        throw const CalorieEstimateException('Empty response from model.');
-      }
-
-      final jsonStr = raw
-          .replaceAll(RegExp(r'```(?:json)?\s*'), '')
-          .replaceAll('```', '')
-          .trim();
-
-      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+      final map = _decode(
+        await _generateWithRetries(_model, [Content.text(prompt)]),
+      );
       final kcal = (map['kcal'] as num).toInt();
       final protein = (map['protein_g'] as num?)?.round();
       final note = map['note'] as String;
 
       await _usageRepo.increment(uid, today);
-      return (kcal: kcal, protein: protein, note: note);
+      return (
+        kcal: kcal,
+        protein: protein,
+        note: note,
+        items: parseEstimateItems(map['items']),
+      );
     } on DailyLimitExceededException {
       rethrow;
     } on CalorieEstimateException {
@@ -139,26 +178,14 @@ class CalorieEstimateService {
 
   Future<VoiceMealParsed> parseVoice(String transcript) async {
     try {
-      final prompt =
-          _voicePromptTemplate.replaceFirst('{input}', transcript.trim());
-      final response = await _generateWithRetries(_model, prompt);
-      final raw = response.text?.trim() ?? '';
-
-      if (raw.isEmpty) {
-        throw const CalorieEstimateException('Empty response from model.');
-      }
-
-      final jsonStr = raw
-          .replaceAll(RegExp(r'```(?:json)?\s*'), '')
-          .replaceAll('```', '')
-          .trim();
-
-      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
-      final name = map['name'] as String;
-      final kcal = (map['kcal'] as num).toInt();
-      final protein = (map['protein_g'] as num?)?.round();
-
-      return (name: name, kcal: kcal, protein: protein);
+      final prompt = _voicePromptTemplate.replaceFirst(
+        '{input}',
+        transcript.trim(),
+      );
+      final map = _decode(
+        await _generateWithRetries(_model, [Content.text(prompt)]),
+      );
+      return _mealFrom(map);
     } on CalorieEstimateException {
       rethrow;
     } on ServerException catch (error, st) {
@@ -172,6 +199,47 @@ class CalorieEstimateService {
     }
   }
 
+  /// Recognises the meal in a JPEG photo. Counts towards the daily AI limit
+  /// like [estimate].
+  Future<VoiceMealParsed> estimateFromPhoto(String uid, Uint8List jpeg) async {
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final count = await _usageRepo.watchCount(uid, today).first;
+    if (count >= AiUsageRepository.dailyLimit) {
+      throw const DailyLimitExceededException();
+    }
+
+    try {
+      final map = _decode(
+        await _generateWithRetries(_model, [
+          Content.multi([
+            TextPart(_photoPromptTemplate),
+            DataPart('image/jpeg', jpeg),
+          ]),
+        ]),
+      );
+      if (map['error'] != null || map['kcal'] is! num) {
+        throw const CalorieEstimateException(
+          'No food found in that photo. Try again with the plate in view.',
+        );
+      }
+      final meal = _mealFrom(map);
+      await _usageRepo.increment(uid, today);
+      return meal;
+    } on DailyLimitExceededException {
+      rethrow;
+    } on CalorieEstimateException {
+      rethrow;
+    } on ServerException catch (error, st) {
+      debugPrint('CalorieEstimateService photo error: $error\n$st');
+      throw CalorieEstimateException(_friendlyServerError(error.message));
+    } catch (error, st) {
+      debugPrint('CalorieEstimateService photo error: $error\n$st');
+      throw const CalorieEstimateException(
+        'Could not read that photo right now.',
+      );
+    }
+  }
+
   /// Protein for a meal logged by name and calories, or null when the name
   /// says nothing about the food (e.g. "Lunch"). Like [parseVoice], this
   /// doesn't count towards the daily AI limit.
@@ -179,18 +247,39 @@ class CalorieEstimateService {
     final prompt = _proteinPromptTemplate
         .replaceFirst('{name}', name.trim())
         .replaceFirst('{kcal}', '$kcal');
-    final response = await _generateWithRetries(_model, prompt);
-    final map = jsonDecode(response.text ?? '') as Map<String, dynamic>;
+    final map = _decode(
+      await _generateWithRetries(_model, [Content.text(prompt)]),
+    );
     return (map['protein_g'] as num?)?.round();
+  }
+
+  VoiceMealParsed _mealFrom(Map<String, dynamic> map) => (
+    name: map['name'] as String,
+    kcal: (map['kcal'] as num).toInt(),
+    protein: (map['protein_g'] as num?)?.round(),
+    items: parseEstimateItems(map['items']),
+  );
+
+  /// The model's JSON reply as a map; code fences are stripped just in case.
+  Map<String, dynamic> _decode(GenerateContentResponse response) {
+    final raw = response.text?.trim() ?? '';
+    if (raw.isEmpty) {
+      throw const CalorieEstimateException('Empty response from model.');
+    }
+    final jsonStr = raw
+        .replaceAll(RegExp(r'```(?:json)?\s*'), '')
+        .replaceAll('```', '')
+        .trim();
+    return jsonDecode(jsonStr) as Map<String, dynamic>;
   }
 
   Future<GenerateContentResponse> _generateWithRetries(
     GenerativeModel model,
-    String prompt,
+    List<Content> content,
   ) async {
     for (var attempt = 1; attempt <= _maxServerRetries; attempt++) {
       try {
-        return await model.generateContent([Content.text(prompt)]);
+        return await model.generateContent(content);
       } on ServerException catch (error) {
         if (!_isTransientServerError(error.message) ||
             attempt == _maxServerRetries) {
