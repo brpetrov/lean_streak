@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
 
+import 'package:lean_streak/app/launch_actions.dart';
 import 'package:lean_streak/core/constants/app_colors.dart';
 import 'package:lean_streak/helpers/quick_log_parser.dart';
 import 'package:lean_streak/helpers/wav.dart';
@@ -78,6 +79,23 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
   void initState() {
     super.initState();
     _focusNode.addListener(() => setState(() {}));
+    ref.listenManual(
+      launchActionProvider,
+      (_, action) => _onLaunchAction(action),
+      fireImmediately: true,
+    );
+  }
+
+  /// A tap on the app-icon shortcut or the home-screen widget: start the mic
+  /// as soon as there is a frame to do it on (on a cold start this runs
+  /// inside initState).
+  void _onLaunchAction(LaunchAction? action) {
+    if (action != LaunchAction.voiceLog) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(launchActionProvider.notifier).clear();
+      if (!_listening && !_working) _toggleListening();
+    });
   }
 
   @override

@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:home_widget/home_widget.dart';
+import 'package:quick_actions/quick_actions.dart';
 
 import 'package:lean_streak/app/router.dart';
 import 'package:lean_streak/services/notification_service.dart';
@@ -7,6 +10,9 @@ import 'package:lean_streak/services/notification_service.dart';
 /// app-icon shortcut or the home-screen widget. Set by [bindLaunchActions] and
 /// consumed once by the screen that can do it.
 enum LaunchAction { logWeight, voiceLog }
+
+/// The app-icon shortcut's id.
+const shortcutLogVoice = 'log_voice';
 
 class LaunchActionNotifier extends Notifier<LaunchAction?> {
   @override
@@ -48,6 +54,31 @@ Future<void> bindLaunchActions(ProviderContainer container) async {
     if (container.exists(goRouterProvider)) {
       container.read(goRouterProvider).go(AppRoutes.dashboard);
     }
+  }
+
+  // Long-press the app icon → "Log by voice". Registered before anything
+  // else is awaited, so a cold start from the shortcut is not missed.
+  final quickActions = QuickActions();
+  await quickActions.initialize((type) {
+    if (type == shortcutLogVoice) dispatch(LaunchAction.voiceLog);
+  });
+  await quickActions.setShortcutItems(const [
+    ShortcutItem(type: shortcutLogVoice, localizedTitle: 'Log by voice'),
+  ]);
+
+  // The Android home-screen widget opens the app with leanstreak://log/voice.
+  // Taps while the app is running arrive on the stream, which must stay
+  // subscribed; a tap that started the app is only reported by
+  // initiallyLaunchedFromHomeWidget.
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    HomeWidget.widgetClicked.listen((uri) {
+      final action = launchActionForUri(uri);
+      if (action != null) dispatch(action);
+    });
+    final widgetLaunch = launchActionForUri(
+      await HomeWidget.initiallyLaunchedFromHomeWidget(),
+    );
+    if (widgetLaunch != null) dispatch(widgetLaunch);
   }
 
   // Taps while the app is running arrive in the callback; a tap that started

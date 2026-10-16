@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lean_streak/app/launch_actions.dart';
 import 'package:lean_streak/models/meal.dart';
 import 'package:lean_streak/providers/ai_usage_provider.dart';
 import 'package:lean_streak/providers/auth_provider.dart';
@@ -105,27 +106,38 @@ void main() {
   late _FakeLogMealController controller;
   late _FakeEstimateService estimateService;
   late _FakeRecorder recorder;
+  late ProviderContainer container;
 
   Future<void> pumpCard(
     WidgetTester tester, {
     List<Meal> recents = const [],
+    LaunchAction? launchAction,
   }) async {
     controller = _FakeLogMealController();
     estimateService = _FakeEstimateService();
     recorder = _FakeRecorder();
+    container = ProviderContainer(
+      overrides: [
+        logMealControllerProvider.overrideWith(() => controller),
+        calorieEstimateServiceProvider.overrideWithValue(estimateService),
+        currentUidProvider.overrideWithValue('user-1'),
+        recentMealsProvider.overrideWith((ref) async => recents),
+        audioRecorderProvider.overrideWithValue(recorder),
+      ],
+    );
+    addTearDown(container.dispose);
+    if (launchAction != null) {
+      container.read(launchActionProvider.notifier).set(launchAction);
+    }
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          logMealControllerProvider.overrideWith(() => controller),
-          calorieEstimateServiceProvider.overrideWithValue(estimateService),
-          currentUidProvider.overrideWithValue('user-1'),
-          recentMealsProvider.overrideWith((ref) async => recents),
-          audioRecorderProvider.overrideWithValue(recorder),
-        ],
+      UncontrolledProviderScope(
+        container: container,
         child: const MaterialApp(home: Scaffold(body: QuickLogBar())),
       ),
     );
   }
+
+  const listening = 'Listening... tap stop when you\'re done.';
 
   String boxText(WidgetTester tester) =>
       tester.widget<TextField>(find.byType(TextField)).controller!.text;
@@ -265,6 +277,38 @@ void main() {
       find.text('Didn\'t catch that. Tap the mic and try again.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets(
+    'a voice launch action waiting before Today opens starts the mic',
+    (tester) async {
+      await pumpCard(tester, launchAction: LaunchAction.voiceLog);
+      await tester.pump(); // the post-frame callback
+      await tester.pump(); // permission check, recorder start
+
+      expect(find.text(listening), findsOneWidget);
+      expect(container.read(launchActionProvider), isNull);
+
+      await tester.tap(find.byTooltip('Stop'));
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets('a voice launch action while Today is open starts the mic', (
+    tester,
+  ) async {
+    await pumpCard(tester);
+    expect(find.text(listening), findsNothing);
+
+    container.read(launchActionProvider.notifier).set(LaunchAction.voiceLog);
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text(listening), findsOneWidget);
+    expect(container.read(launchActionProvider), isNull);
+
+    await tester.tap(find.byTooltip('Stop'));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('keyboard done saves when calories are present', (tester) async {
