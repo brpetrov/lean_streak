@@ -7,6 +7,7 @@ import 'package:lean_streak/models/meal.dart';
 import 'package:lean_streak/providers/ai_usage_provider.dart';
 import 'package:lean_streak/providers/auth_provider.dart';
 import 'package:lean_streak/providers/log_meal_controller.dart';
+import 'package:lean_streak/providers/meal_provider.dart';
 import 'package:lean_streak/screens/dashboard/helpers/quick_log_bar.dart';
 import 'package:lean_streak/services/calorie_estimate_service.dart';
 
@@ -54,11 +55,25 @@ class _FakeEstimateService implements CalorieEstimateService {
       throw UnimplementedError();
 }
 
+Meal _recent(String name, double kcal, double? protein) => Meal(
+  id: name,
+  date: '2026-10-15',
+  timestamp: DateTime(2026, 10, 15, 12),
+  name: name,
+  calories: kcal,
+  proteinGrams: protein,
+  createdAt: DateTime(2026, 10, 15, 12),
+  updatedAt: DateTime(2026, 10, 15, 12),
+);
+
 void main() {
   late _FakeLogMealController controller;
   late _FakeEstimateService estimateService;
 
-  Future<void> pumpCard(WidgetTester tester) async {
+  Future<void> pumpCard(
+    WidgetTester tester, {
+    List<Meal> recents = const [],
+  }) async {
     controller = _FakeLogMealController();
     estimateService = _FakeEstimateService();
     await tester.pumpWidget(
@@ -67,6 +82,7 @@ void main() {
           logMealControllerProvider.overrideWith(() => controller),
           calorieEstimateServiceProvider.overrideWithValue(estimateService),
           currentUidProvider.overrideWithValue('user-1'),
+          recentMealsProvider.overrideWith((ref) async => recents),
         ],
         child: const MaterialApp(home: Scaffold(body: QuickLogBar())),
       ),
@@ -129,6 +145,44 @@ void main() {
     await tester.enterText(find.byType(TextField), 'wrap');
     await tester.pump();
     expect(find.byTooltip('Photo'), findsNothing);
+  });
+
+  testWidgets('offers recent meals while the box is focused', (tester) async {
+    await pumpCard(
+      tester,
+      recents: [
+        _recent('Porridge with banana', 355, 13),
+        _recent('Musaka', 640, 28),
+        _recent('Apple', 80, 0),
+        _recent('Chicken wrap', 450, 30),
+      ],
+    );
+    await tester.pump();
+    expect(find.byType(ActionChip), findsNothing);
+
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+    expect(find.byType(ActionChip, skipOffstage: false), findsNWidgets(3));
+    expect(find.text('Musaka · 640 kcal'), findsOneWidget);
+    expect(
+      find.text('Chicken wrap · 450 kcal', skipOffstage: false),
+      findsNothing,
+    );
+
+    await tester.enterText(find.byType(TextField), 'wrap');
+    await tester.pump();
+    expect(find.byType(ActionChip), findsOneWidget);
+
+    await tester.tap(find.text('Chicken wrap · 450 kcal'));
+    await tester.pump();
+    expect(boxText(tester), 'Chicken wrap 450 kcal 30g protein');
+    expect(find.byType(ActionChip), findsNothing);
+
+    await tester.tap(find.byTooltip('Save'));
+    await tester.pump();
+    expect(controller.saved, [
+      (name: 'Chicken wrap', calories: 450.0, protein: 30.0),
+    ]);
   });
 
   testWidgets('keyboard done saves when calories are present', (tester) async {

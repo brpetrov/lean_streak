@@ -7,9 +7,11 @@ import 'package:speech_to_text/speech_to_text.dart';
 
 import 'package:lean_streak/core/constants/app_colors.dart';
 import 'package:lean_streak/helpers/quick_log_parser.dart';
+import 'package:lean_streak/models/meal.dart';
 import 'package:lean_streak/providers/ai_usage_provider.dart';
 import 'package:lean_streak/providers/auth_provider.dart';
 import 'package:lean_streak/providers/log_meal_controller.dart';
+import 'package:lean_streak/providers/meal_provider.dart';
 import 'package:lean_streak/screens/meals/log_meal_sheet.dart';
 import 'package:lean_streak/services/calorie_estimate_service.dart';
 import 'package:lean_streak/widgets/estimate_breakdown.dart';
@@ -17,7 +19,8 @@ import 'package:lean_streak/widgets/estimate_breakdown.dart';
 /// The log composer pinned to the bottom of Today, under the thumb.
 /// "chicken wrap 450" saves straight away; a meal without calories can be
 /// estimated by the AI, or a photo taken. With the box empty the main
-/// button is the mic.
+/// button is the mic. While the box is focused, recent meals are offered as
+/// chips for one-tap re-logging.
 class QuickLogBar extends ConsumerStatefulWidget {
   const QuickLogBar({super.key});
 
@@ -28,6 +31,7 @@ class QuickLogBar extends ConsumerStatefulWidget {
 class _QuickLogBarState extends ConsumerState<QuickLogBar> {
   final _controller = TextEditingController();
   final _speechToText = SpeechToText();
+  final _focusNode = FocusNode();
 
   bool _speechInitialized = false;
   bool _speechAvailable = false;
@@ -49,8 +53,15 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
   };
 
   @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() => setState(() {}));
+  }
+
+  @override
   void dispose() {
     _speechToText.cancel();
+    _focusNode.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -257,6 +268,13 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
     final entry = _entry;
     final hasText = _controller.text.trim().isNotEmpty;
     final showStatus = hasText || _listening || _working || _error != null;
+    // Watched whether or not the box is focused, so the chips are ready the
+    // moment it is and the list isn't refetched on every focus.
+    final allRecents =
+        ref.watch(recentMealsProvider).valueOrNull ?? const <Meal>[];
+    final recents = _focusNode.hasFocus && !_listening && !_working
+        ? _matchingRecents(allRecents, _controller.text)
+        : const <Meal>[];
 
     return Material(
       color: AppColors.surface,
@@ -275,6 +293,10 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (recents.isNotEmpty) ...[
+                      _buildRecents(recents),
+                      const SizedBox(height: 8),
+                    ],
                     if (showStatus) ...[
                       _buildStatus(entry, hasText),
                       const SizedBox(height: 8),
@@ -284,6 +306,7 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
                         Expanded(
                           child: TextField(
                             controller: _controller,
+                            focusNode: _focusNode,
                             autofocus: _isDesktop,
                             readOnly: _working || _listening,
                             textCapitalization: TextCapitalization.sentences,
@@ -341,6 +364,54 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// Up to three recent meals: the latest ones while the box is empty,
+  /// otherwise those whose name contains what has been typed.
+  List<Meal> _matchingRecents(List<Meal> all, String text) {
+    final query = text.trim().toLowerCase();
+    return all
+        .where(
+          (meal) => query.isEmpty || meal.name!.toLowerCase().contains(query),
+        )
+        .take(3)
+        .toList();
+  }
+
+  /// One scrolling row of chips; tapping one fills the box ready to save.
+  Widget _buildRecents(List<Meal> recents) {
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: recents.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (_, index) {
+          final meal = recents[index];
+          final kcal = meal.calories.round();
+          return Center(
+            child: ActionChip(
+              label: Text('${meal.name} · $kcal kcal'),
+              labelStyle: TextStyle(fontSize: 13, color: AppColors.textPrimary),
+              backgroundColor: AppColors.surfaceVariant,
+              side: BorderSide.none,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              onPressed: () {
+                _setText(
+                  '${meal.name} '
+                  '${_amounts(kcal, meal.proteinGrams?.round())}',
+                );
+                _focusNode.requestFocus();
+                setState(() {
+                  _aiItems = const [];
+                  _error = null;
+                });
+              },
+            ),
+          );
+        },
       ),
     );
   }

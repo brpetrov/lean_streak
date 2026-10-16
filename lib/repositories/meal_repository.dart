@@ -38,6 +38,14 @@ class MealRepository {
     });
   }
 
+  /// The latest [limit] meals logged, newest first.
+  Future<List<Meal>> fetchRecentMeals(String uid, {int limit = 60}) async {
+    final snapshot = await _meals(
+      uid,
+    ).orderBy('createdAt', descending: true).limit(limit).get();
+    return snapshot.docs.map((doc) => Meal.fromFirestore(doc)).toList();
+  }
+
   Future<void> deleteMeal(String uid, String mealId) async {
     await _meals(uid).doc(mealId).delete();
   }
