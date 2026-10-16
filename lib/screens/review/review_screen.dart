@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import 'package:lean_streak/core/constants/app_colors.dart';
-import 'package:lean_streak/models/check_in.dart';
 import 'package:lean_streak/models/daily_summary.dart';
 import 'package:lean_streak/models/period_review.dart';
 import 'package:lean_streak/providers/period_review_provider.dart';
@@ -478,10 +477,6 @@ class _PeriodReviewCard extends ConsumerWidget {
             ],
           ),
         ),
-        if (isMonth && review.checkIns.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _CheckInsCard(checkIns: review.checkIns),
-        ],
       ],
     );
   }
@@ -541,54 +536,6 @@ class _ReviewHeadline extends StatelessWidget {
           ],
         ),
       ],
-    );
-  }
-}
-
-class _CheckInsCard extends StatelessWidget {
-  const _CheckInsCard({required this.checkIns});
-
-  final List<CheckIn> checkIns;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Check-ins',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          for (final checkIn in checkIns) ...[
-            const SizedBox(height: 12),
-            Text(
-              '${DateFormat('d MMM').format(checkIn.periodEnd)} · '
-              '${checkIn.recommendation.label}',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            if (checkIn.recommendationReason case final reason?) ...[
-              const SizedBox(height: 2),
-              Text(
-                reason,
-                style: const TextStyle(
-                  fontSize: 13,
-                  height: 1.4,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ],
-        ],
-      ),
     );
   }
 }

@@ -4,25 +4,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import 'package:lean_streak/app/launch_actions.dart';
 import 'package:lean_streak/app/router.dart';
 import 'package:lean_streak/core/constants/app_colors.dart';
 import 'package:lean_streak/helpers/health_calculator.dart';
 import 'package:lean_streak/models/daily_summary.dart';
 import 'package:lean_streak/models/meal.dart';
 import 'package:lean_streak/models/user_profile.dart';
-import 'package:lean_streak/providers/check_in_controller.dart';
-import 'package:lean_streak/providers/check_in_state_provider.dart';
 import 'package:lean_streak/providers/daily_summary_provider.dart';
 import 'package:lean_streak/providers/log_meal_controller.dart';
 import 'package:lean_streak/providers/meal_provider.dart';
 import 'package:lean_streak/providers/review_provider.dart';
 import 'package:lean_streak/providers/user_profile_provider.dart';
 import 'package:lean_streak/providers/weight_entry_provider.dart';
-import 'package:lean_streak/screens/dashboard/helpers/check_in_dialog.dart';
 import 'package:lean_streak/screens/dashboard/helpers/quick_log_bar.dart';
 import 'package:lean_streak/screens/meals/log_meal_sheet.dart';
 import 'package:lean_streak/screens/progress/helpers/log_weight_dialog.dart';
-import 'package:lean_streak/services/check_in_service.dart';
 import 'package:lean_streak/widgets/app_card.dart';
 import 'package:lean_streak/widgets/app_frame.dart';
 import 'package:lean_streak/widgets/calorie_bars.dart';
@@ -39,7 +36,6 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen>
     with WidgetsBindingObserver {
-  String? _scheduledPromptPeriodKey;
   late DateTime _activeDate;
   Timer? _midnightRefreshTimer;
 
@@ -49,6 +45,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     _activeDate = _normalizeDate(DateTime.now());
     WidgetsBinding.instance.addObserver(this);
     _scheduleMidnightRefresh();
+    // fireImmediately catches an action set before Today mounted (cold start,
+    // or while the user was still signing in).
+    ref.listenManual(
+      launchActionProvider,
+      (_, action) => _onLaunchAction(action),
+      fireImmediately: true,
+    );
+  }
+
+  void _onLaunchAction(LaunchAction? action) {
+    if (action != LaunchAction.logWeight) return;
+    // Deferred: on a cold start this runs inside initState, before there is
+    // a frame to show a dialog on.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(launchActionProvider.notifier).clear();
+      _showLogWeightWithFeedback(context);
+    });
   }
 
   @override
@@ -76,7 +90,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   void _refreshActiveDateIfNeeded() {
     final nextDate = _normalizeDate(DateTime.now());
     if (!_isSameDate(_activeDate, nextDate)) {
-      ref.invalidate(currentCheckInAvailabilityProvider);
       ref.invalidate(reviewPeriodsProvider);
       setState(() {
         _activeDate = nextDate;
@@ -98,44 +111,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     final profileAsync = ref.watch(userProfileProvider);
     final today = _activeDate;
     final dateKey = DateFormat('yyyy-MM-dd').format(today);
-
-    ref.listen<AsyncValue<CheckInAvailability?>>(
-      currentCheckInAvailabilityProvider,
-      (_, next) {
-        final availability = next.valueOrNull;
-        final period = availability?.period;
-        if (availability == null ||
-            period == null ||
-            !availability.isDue ||
-            availability.isCompleted ||
-            availability.hasPromptBeenShown ||
-            _scheduledPromptPeriodKey == period.key) {
-          return;
-        }
-
-        _scheduledPromptPeriodKey = period.key;
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
-          await ref
-              .read(checkInControllerProvider.notifier)
-              .markPromptShown(
-                periodKey: period.key,
-                periodStart: period.startDate,
-                periodEnd: period.endDate,
-              );
-          if (!context.mounted) return;
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('A 2-week check-in is ready.'),
-              action: SnackBarAction(
-                label: 'Open',
-                onPressed: () => _openCheckInFlow(context, availability),
-              ),
-            ),
-          );
-        });
-      },
-    );
 
     return AppFrame(
       title: 'Today',
@@ -239,37 +214,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         ),
       ),
     );
-  }
-
-  Future<void> _openCheckInFlow(
-    BuildContext context,
-    CheckInAvailability? availability,
-  ) async {
-    if (availability == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Check-in is not ready yet.')));
-      return;
-    }
-
-    if (!availability.isDue || availability.period == null) {
-      await showCheckInUnavailableDialog(
-        context,
-        nextAvailableDate: availability.nextAvailableDate,
-      );
-      return;
-    }
-
-    final result = await showCheckInDialog(context, availability: availability);
-    if (!context.mounted || result == null) return;
-
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Check-in saved.')));
-
-    if (result == CheckInDialogResult.savedAndOpenProfile) {
-      context.push(AppRoutes.planSettings);
-    }
   }
 }
 
@@ -672,13 +616,25 @@ class _MonthPreviewCard extends ConsumerWidget {
   }
 }
 
+Future<void> _showLogWeightWithFeedback(BuildContext context) async {
+  final result = await showLogWeightDialog(context);
+  if (!context.mounted || result == null) return;
+  final message = result.targetChanged
+      ? 'Weight saved. New target: ${result.newCalorieTarget} kcal.'
+      : 'Weight saved.';
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+}
+
 class _WeightCard extends ConsumerWidget {
   const _WeightCard();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final entries = ref.watch(weightEntriesProvider).valueOrNull ?? const [];
-    final latest = entries.isNotEmpty ? entries.last.weightKg : null;
+    final latest = entries.lastOrNull;
+    final daysAgo = latest == null
+        ? 0
+        : DateTime.now().difference(latest.date).inDays;
 
     return AppCard(
       onTap: () => context.push(AppRoutes.progress),
@@ -701,9 +657,12 @@ class _WeightCard extends ConsumerWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  latest != null
-                      ? 'Latest: ${latest.toStringAsFixed(1)} kg'
-                      : 'Log your weight to track progress',
+                  latest == null
+                      ? 'Log your weight to track progress'
+                      : daysAgo > 7
+                      ? 'Latest: ${latest.weightKg.toStringAsFixed(1)} kg'
+                            ' · $daysAgo days ago'
+                      : 'Latest: ${latest.weightKg.toStringAsFixed(1)} kg',
                   style: const TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
@@ -713,16 +672,7 @@ class _WeightCard extends ConsumerWidget {
             ),
           ),
           TextButton(
-            onPressed: () async {
-              final result = await showLogWeightDialog(context);
-              if (!context.mounted || result == null) return;
-              final message = result.targetChanged
-                  ? 'Weight saved. New target: ${result.newCalorieTarget} kcal.'
-                  : 'Weight saved.';
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text(message)));
-            },
+            onPressed: () => _showLogWeightWithFeedback(context),
             child: const Text('Log'),
           ),
         ],

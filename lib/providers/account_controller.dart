@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:lean_streak/providers/account_provider.dart';
 import 'package:lean_streak/providers/auth_provider.dart';
-import 'package:lean_streak/providers/check_in_state_provider.dart';
 import 'package:lean_streak/providers/user_profile_provider.dart';
 
 class AccountActionException implements Exception {
@@ -122,7 +121,6 @@ class AccountController extends AsyncNotifier<void> {
     try {
       final user = await _reauthenticate(password);
       await ref.read(accountRepositoryProvider).resetProgress(user.uid);
-      ref.invalidate(currentCheckInAvailabilityProvider);
       state = const AsyncData(null);
     } catch (error, stackTrace) {
       state = AsyncError(error, stackTrace);
@@ -138,7 +136,6 @@ class AccountController extends AsyncNotifier<void> {
       await ref.read(accountRepositoryProvider).deleteAccountData(user.uid);
       await user.delete();
       await FirebaseAuth.instance.signOut();
-      ref.invalidate(currentCheckInAvailabilityProvider);
       state = const AsyncData(null);
     } catch (error, stackTrace) {
       state = AsyncError(error, stackTrace);

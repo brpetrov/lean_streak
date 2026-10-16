@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lean_streak/core/constants/app_colors.dart';
 import 'package:lean_streak/providers/account_controller.dart';
 import 'package:lean_streak/providers/auth_provider.dart';
+import 'package:lean_streak/providers/reminder_provider.dart';
 import 'package:lean_streak/providers/user_profile_provider.dart';
 import 'package:lean_streak/widgets/password_confirm_dialog.dart';
 import 'package:lean_streak/widgets/responsive_page.dart';
@@ -209,6 +210,9 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
                             : Text('Save Account'),
                       ),
                       SizedBox(height: 28),
+                      const _AccountSectionLabel('REMINDERS'),
+                      const _ReminderSwitches(),
+                      SizedBox(height: 28),
                       const _AccountSectionLabel('PASSWORD'),
                       OutlinedButton.icon(
                         onPressed: isWorking ? null : _sendPasswordReset,
@@ -243,6 +247,49 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The two notification switches. Turning one on asks the system for
+/// permission; if that is refused the switch stays off.
+class _ReminderSwitches extends ConsumerWidget {
+  const _ReminderSwitches();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(reminderSettingsProvider);
+    final notifier = ref.read(reminderSettingsProvider.notifier);
+
+    Future<void> apply(Future<bool> Function() change) async {
+      final ok = await change();
+      if (ok || !context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Allow notifications for LeanStreak in system settings.',
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Daily meal reminder'),
+          subtitle: const Text('Every evening at 20:30'),
+          value: settings.dailyMeal,
+          onChanged: (on) => apply(() => notifier.setDailyMeal(on)),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Weekly weigh-in reminder'),
+          subtitle: const Text('A week after your last weigh-in, at 09:00'),
+          value: settings.weeklyWeight,
+          onChanged: (on) => apply(() => notifier.setWeeklyWeight(on)),
+        ),
+      ],
     );
   }
 }

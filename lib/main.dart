@@ -2,9 +2,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lean_streak/app/app.dart';
+import 'package:lean_streak/app/launch_actions.dart';
 import 'package:lean_streak/core/constants/app_colors.dart';
 import 'package:lean_streak/firebase_options.dart';
-import 'package:lean_streak/services/notification_service.dart';
+import 'package:lean_streak/providers/preferences_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +20,14 @@ void main() async {
   ErrorWidget.builder = (details) {
     return _StartupErrorApp(message: details.exceptionAsString());
   };
+
+  final prefs = await SharedPreferences.getInstance();
+  final container = ProviderContainer(
+    overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
+  );
+  // Taps on a notification (later: shortcut, widget) only need the container,
+  // so wire them before Firebase; a tap that started the app must not be lost.
+  final launchActionsReady = bindLaunchActions(container);
 
   try {
     try {
@@ -37,12 +47,17 @@ void main() async {
   }
 
   try {
-    await NotificationService.initializeAndScheduleDailyReminder();
+    await launchActionsReady;
   } catch (error) {
-    debugPrint('Notification setup failed: $error');
+    debugPrint('Launch action setup failed: $error');
   }
 
-  runApp(const ProviderScope(child: LeanStreakApp()));
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const LeanStreakApp(),
+    ),
+  );
 }
 
 class _StartupErrorApp extends StatelessWidget {

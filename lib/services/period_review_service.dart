@@ -1,4 +1,3 @@
-import 'package:lean_streak/models/check_in.dart';
 import 'package:lean_streak/models/daily_summary.dart';
 import 'package:lean_streak/models/period_review.dart';
 
@@ -7,13 +6,10 @@ class PeriodReviewService {
     required DateTime startDate,
     required DateTime endDate,
     required List<DailySummary> summaries,
-    List<CheckIn> checkIns = const [],
   }) {
     final sortedSummaries = [...summaries]
       ..sort((a, b) => a.date.compareTo(b.date));
     final activeSummaries = sortedSummaries.where(_hasLoggedActivity).toList();
-    final sortedCheckIns = [...checkIns]
-      ..sort((a, b) => a.periodStart.compareTo(b.periodStart));
 
     final daysInPeriod = endDate.difference(startDate).inDays + 1;
     final loggedDays = activeSummaries.length;
@@ -70,7 +66,6 @@ class PeriodReviewService {
       calorieConsistencyRate: calorieConsistencyRate,
       bestDay: bestDay,
       worstDay: worstDay,
-      checkIns: sortedCheckIns,
       guidance: _buildGuidance(
         calorieConsistencyRate: calorieConsistencyRate,
         daysInPeriod: daysInPeriod,

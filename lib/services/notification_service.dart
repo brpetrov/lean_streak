@@ -4,27 +4,23 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
+/// Local reminders on Android and iOS. Scheduling is driven by
+/// `reminderSyncProvider`; taps are reported through [initialize]'s callback
+/// (app running) or [launchPayload] (app started by the tap).
 class NotificationService {
   NotificationService._();
+
+  static const payloadLogMeals = 'log_meals';
+  static const payloadLogWeight = 'log_weight';
 
   static final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
 
   static const int _dailyReminderId = 1001;
+  static const int _weeklyWeightReminderId = 1002;
   static bool _initialized = false;
 
-  static Future<void> initializeAndScheduleDailyReminder() async {
-    if (!_supportsLocalNotifications) return;
-
-    await _initialize();
-    final permissionGranted = await _requestPermissionIfNeeded();
-    if (!permissionGranted) return;
-
-    final androidScheduleMode = await _resolveAndroidScheduleMode();
-    await _scheduleDailyReminder(androidScheduleMode: androidScheduleMode);
-  }
-
-  static bool get _supportsLocalNotifications {
+  static bool get isSupported {
     if (kIsWeb) return false;
     return switch (defaultTargetPlatform) {
       TargetPlatform.android || TargetPlatform.iOS => true,
@@ -32,8 +28,11 @@ class NotificationService {
     };
   }
 
-  static Future<void> _initialize() async {
-    if (_initialized) return;
+  /// Sets up the plugin and timezone. Does not ask for permission.
+  static Future<void> initialize({
+    required void Function(String payload) onTap,
+  }) async {
+    if (!isSupported || _initialized) return;
 
     tz.initializeTimeZones();
     final timezoneInfo = await FlutterTimezone.getLocalTimezone();
@@ -48,25 +47,33 @@ class NotificationService {
       ),
     );
 
-    await _notifications.initialize(settings: initializationSettings);
+    await _notifications.initialize(
+      settings: initializationSettings,
+      onDidReceiveNotificationResponse: (response) {
+        final payload = response.payload;
+        if (payload != null) onTap(payload);
+      },
+    );
     _initialized = true;
   }
 
-  static Future<bool> _requestPermissionIfNeeded() async {
+  /// Payload of the notification that started the app, if one did. A
+  /// cold-start tap is only reported here, never through the callback.
+  static Future<String?> launchPayload() async {
+    if (!isSupported) return null;
+    final details = await _notifications.getNotificationAppLaunchDetails();
+    if (details?.didNotificationLaunchApp != true) return null;
+    return details!.notificationResponse?.payload;
+  }
+
+  /// Shows the system permission dialog. Call from a toggle or first run only.
+  static Future<bool> requestPermission() async {
+    if (!isSupported) return false;
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        final androidImplementation = _notifications
-            .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin
-            >();
-        return await androidImplementation?.requestNotificationsPermission() ??
-            true;
+        return await _android?.requestNotificationsPermission() ?? true;
       case TargetPlatform.iOS:
-        final iosImplementation = _notifications
-            .resolvePlatformSpecificImplementation<
-              IOSFlutterLocalNotificationsPlugin
-            >();
-        return await iosImplementation?.requestPermissions(
+        return await _ios?.requestPermissions(
               alert: true,
               badge: true,
               sound: true,
@@ -77,32 +84,21 @@ class NotificationService {
     }
   }
 
-  static Future<AndroidScheduleMode> _resolveAndroidScheduleMode() async {
-    if (defaultTargetPlatform != TargetPlatform.android) {
-      return AndroidScheduleMode.inexactAllowWhileIdle;
+  /// Current permission state, without prompting.
+  static Future<bool> hasPermission() async {
+    if (!isSupported) return false;
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return await _android?.areNotificationsEnabled() ?? false;
+      case TargetPlatform.iOS:
+        return (await _ios?.checkPermissions())?.isEnabled ?? false;
+      default:
+        return false;
     }
-
-    final androidImplementation = _notifications
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
-
-    final canScheduleExact =
-        await androidImplementation?.canScheduleExactNotifications() ?? false;
-    if (canScheduleExact) {
-      return AndroidScheduleMode.exactAllowWhileIdle;
-    }
-
-    final grantedExactPermission =
-        await androidImplementation?.requestExactAlarmsPermission() ?? false;
-    return grantedExactPermission
-        ? AndroidScheduleMode.exactAllowWhileIdle
-        : AndroidScheduleMode.inexactAllowWhileIdle;
   }
 
-  static Future<void> _scheduleDailyReminder({
-    required AndroidScheduleMode androidScheduleMode,
-  }) async {
+  static Future<void> scheduleDailyMealReminder() async {
+    if (!isSupported) return;
     await _notifications.cancel(id: _dailyReminderId);
 
     final now = tz.TZDateTime.now(tz.local);
@@ -114,30 +110,88 @@ class NotificationService {
       20,
       30,
     );
-
     if (!scheduledTime.isAfter(now)) {
       scheduledTime = scheduledTime.add(const Duration(days: 1));
     }
-
-    const notificationDetails = NotificationDetails(
-      android: AndroidNotificationDetails(
-        'daily_log_reminder',
-        'Daily Log Reminder',
-        channelDescription: 'Reminds you each evening to log your meals.',
-        importance: Importance.defaultImportance,
-        priority: Priority.defaultPriority,
-      ),
-      iOS: DarwinNotificationDetails(),
-    );
 
     await _notifications.zonedSchedule(
       id: _dailyReminderId,
       title: 'Log today before the day ends',
       body: 'Open LeanStreak and log your meals for today.',
       scheduledDate: scheduledTime,
-      notificationDetails: notificationDetails,
-      androidScheduleMode: androidScheduleMode,
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'daily_log_reminder',
+          'Daily Log Reminder',
+          channelDescription: 'Reminds you each evening to log your meals.',
+          importance: Importance.defaultImportance,
+          priority: Priority.defaultPriority,
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+      androidScheduleMode: await _androidScheduleMode(),
       matchDateTimeComponents: DateTimeComponents.time,
+      payload: payloadLogMeals,
     );
+  }
+
+  static Future<void> cancelDailyMealReminder() async {
+    if (!isSupported) return;
+    await _notifications.cancel(id: _dailyReminderId);
+  }
+
+  /// Fires at [firstFireAt] and then weekly at the same weekday and time.
+  static Future<void> scheduleWeeklyWeightReminder({
+    required DateTime firstFireAt,
+  }) async {
+    if (!isSupported) return;
+    await _notifications.cancel(id: _weeklyWeightReminderId);
+
+    await _notifications.zonedSchedule(
+      id: _weeklyWeightReminderId,
+      title: 'Time to weigh in',
+      body: 'Log this week\'s weight to keep your plan accurate.',
+      scheduledDate: tz.TZDateTime.from(firstFireAt, tz.local),
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'weekly_weight_reminder',
+          'Weekly Weight Reminder',
+          channelDescription: 'Reminds you once a week to log your weight.',
+          importance: Importance.defaultImportance,
+          priority: Priority.defaultPriority,
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+      androidScheduleMode: await _androidScheduleMode(),
+      matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+      payload: payloadLogWeight,
+    );
+  }
+
+  static Future<void> cancelWeeklyWeightReminder() async {
+    if (!isSupported) return;
+    await _notifications.cancel(id: _weeklyWeightReminderId);
+  }
+
+  static AndroidFlutterLocalNotificationsPlugin? get _android => _notifications
+      .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin
+      >();
+
+  static IOSFlutterLocalNotificationsPlugin? get _ios => _notifications
+      .resolvePlatformSpecificImplementation<
+        IOSFlutterLocalNotificationsPlugin
+      >();
+
+  /// Exact alarms when already allowed; otherwise inexact, which is fine for
+  /// reminders and avoids sending the user to system settings on every launch.
+  static Future<AndroidScheduleMode> _androidScheduleMode() async {
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      return AndroidScheduleMode.inexactAllowWhileIdle;
+    }
+    final exact = await _android?.canScheduleExactNotifications() ?? false;
+    return exact
+        ? AndroidScheduleMode.exactAllowWhileIdle
+        : AndroidScheduleMode.inexactAllowWhileIdle;
   }
 }

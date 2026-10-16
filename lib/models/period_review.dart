@@ -1,4 +1,3 @@
-import 'package:lean_streak/models/check_in.dart';
 import 'package:lean_streak/models/daily_summary.dart';
 
 class PeriodReview {
@@ -17,7 +16,6 @@ class PeriodReview {
     required this.calorieConsistencyRate,
     required this.bestDay,
     required this.worstDay,
-    required this.checkIns,
     required this.guidance,
   });
 
@@ -35,6 +33,5 @@ class PeriodReview {
   final double calorieConsistencyRate;
   final DailySummary? bestDay;
   final DailySummary? worstDay;
-  final List<CheckIn> checkIns;
   final List<String> guidance;
 }
