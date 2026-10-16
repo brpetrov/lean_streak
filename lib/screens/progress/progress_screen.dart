@@ -10,6 +10,7 @@ import 'package:lean_streak/models/user_profile.dart';
 import 'package:lean_streak/models/weight_entry.dart';
 import 'package:lean_streak/providers/user_profile_provider.dart';
 import 'package:lean_streak/providers/weight_entry_provider.dart';
+import 'package:lean_streak/providers/weight_log_controller.dart';
 import 'package:lean_streak/screens/progress/helpers/log_weight_dialog.dart';
 import 'package:lean_streak/widgets/app_card.dart';
 import 'package:lean_streak/widgets/responsive_page.dart';
@@ -64,15 +65,26 @@ class ProgressScreen extends ConsumerWidget {
                     _WeightChartCard(entries: entries, profile: profile),
                     const SizedBox(height: 16),
                     _HistorySection(entries: entries),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () => _resetHistory(context, ref),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.error,
+                        ),
+                        icon: const Icon(Icons.restart_alt_rounded),
+                        label: const Text('Reset progress'),
+                      ),
+                    ),
                   ],
                 ),
               ),
             ],
           );
         },
-        loading: () => Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
+        loading: () =>
+            Center(child: CircularProgressIndicator(color: AppColors.primary)),
         error: (_, _) => Center(
           child: Text(
             'Could not load your weight history right now.',
@@ -94,6 +106,46 @@ class ProgressScreen extends ConsumerWidget {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// Clears the chart and history so progress counts from the next weigh-in.
+  Future<void> _resetHistory(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset progress?'),
+        content: const Text(
+          'This deletes your weight history, so the chart starts again from '
+          'your next weigh-in. Your plan, meals and profile stay.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final ok = await ref
+        .read(weightLogControllerProvider.notifier)
+        .resetHistory();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? 'Weight history cleared.'
+              : 'Could not reset progress right now.',
+        ),
+      ),
+    );
   }
 }
 
@@ -122,8 +174,7 @@ class _StatsHeader extends StatelessWidget {
           Expanded(
             child: _StatBlock(
               label: 'Change',
-              value:
-                  '${delta >= 0 ? '+' : ''}${delta.toStringAsFixed(1)} kg',
+              value: '${delta >= 0 ? '+' : ''}${delta.toStringAsFixed(1)} kg',
               highlight: delta <= 0 ? AppColors.veryGood : AppColors.bad,
             ),
           ),
@@ -140,11 +191,7 @@ class _StatsHeader extends StatelessWidget {
 }
 
 class _StatBlock extends StatelessWidget {
-  const _StatBlock({
-    required this.label,
-    required this.value,
-    this.highlight,
-  });
+  const _StatBlock({required this.label, required this.value, this.highlight});
 
   final String label;
   final String value;

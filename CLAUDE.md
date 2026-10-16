@@ -30,7 +30,7 @@ firebase deploy --only firestore:rules  # Deploy Firestore security rules
 
 **Device settings:** Theme, reminder switches and voice language live in SharedPreferences through `sharedPreferencesProvider` (`lib/providers/preferences_provider.dart`), overridden in `main()` so readers never wait on it.
 
-**Firestore structure:** All user data lives under `/users/{uid}/` with subcollections for meals, daily summaries, weight entries, AI usage and past-day edits (period reviews are computed, not stored; old `check_ins` documents are only touched by Reset Progress). Security rules enforce owner-only access.
+**Firestore structure:** All user data lives under `/users/{uid}/` with subcollections for meals, daily summaries, weight entries, AI usage and past-day edits (period reviews are computed, not stored; old `check_ins` documents are only deleted along with the account). Reset progress on Weight & Progress clears `weight_entries` only.. Security rules enforce owner-only access.
 
 ## Key Domain Logic
 

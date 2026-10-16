@@ -115,19 +115,6 @@ class AccountController extends AsyncNotifier<void> {
     }
   }
 
-  Future<void> resetProgress({required String password}) async {
-    state = const AsyncLoading();
-
-    try {
-      final user = await _reauthenticate(password);
-      await ref.read(accountRepositoryProvider).resetProgress(user.uid);
-      state = const AsyncData(null);
-    } catch (error, stackTrace) {
-      state = AsyncError(error, stackTrace);
-      rethrow;
-    }
-  }
-
   Future<void> deleteAccount({required String password}) async {
     state = const AsyncLoading();
 

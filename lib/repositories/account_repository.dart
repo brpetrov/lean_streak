@@ -9,19 +9,21 @@ class AccountRepository {
     return _db.collection('users').doc(uid);
   }
 
-  Future<void> resetProgress(String uid) async {
-    final userDoc = _userDoc(uid);
-
-    await _deleteCollection(userDoc.collection('meals'));
-    await _deleteCollection(userDoc.collection('daily_summaries'));
-    await _deleteCollection(userDoc.collection('check_ins'));
-    await _deleteCollection(userDoc.collection('check_in_prompt_status'));
-    await _deleteCollection(userDoc.collection('ai_usage'));
-  }
-
+  /// Every subcollection under the user, then the user document itself.
   Future<void> deleteAccountData(String uid) async {
-    await resetProgress(uid);
-    await _userDoc(uid).delete();
+    final userDoc = _userDoc(uid);
+    for (final name in const [
+      'meals',
+      'daily_summaries',
+      'weight_entries',
+      'day_edits',
+      'ai_usage',
+      'check_ins',
+      'check_in_prompt_status',
+    ]) {
+      await _deleteCollection(userDoc.collection(name));
+    }
+    await userDoc.delete();
   }
 
   Future<void> _deleteCollection(

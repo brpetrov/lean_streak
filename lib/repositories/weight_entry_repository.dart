@@ -23,11 +23,24 @@ class WeightEntryRepository {
     });
   }
 
+  /// Removes every entry, so progress counts from the next weigh-in.
+  Future<void> deleteAll(String uid) async {
+    while (true) {
+      final snapshot = await _entries(uid).limit(200).get();
+      if (snapshot.docs.isEmpty) return;
+
+      final batch = _db.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    }
+  }
+
   Future<WeightEntry?> latestEntry(String uid) async {
-    final snapshot = await _entries(uid)
-        .orderBy('dateKey', descending: true)
-        .limit(1)
-        .get();
+    final snapshot = await _entries(
+      uid,
+    ).orderBy('dateKey', descending: true).limit(1).get();
     if (snapshot.docs.isEmpty) return null;
     return WeightEntry.fromFirestore(snapshot.docs.first);
   }

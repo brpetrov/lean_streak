@@ -4,11 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import 'package:lean_streak/app/router.dart';
 import 'package:lean_streak/core/constants/app_colors.dart';
-import 'package:lean_streak/providers/account_controller.dart';
 import 'package:lean_streak/providers/auth_controller.dart';
 import 'package:lean_streak/providers/theme_controller.dart';
 import 'package:lean_streak/widgets/app_logo_mark.dart';
-import 'package:lean_streak/widgets/password_confirm_dialog.dart';
 
 /// The home shell: app bar with the menu, the page body, and an optional bar
 /// pinned to the bottom (kept above the keyboard).
@@ -29,7 +27,6 @@ class AppFrame extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authControllerProvider);
-    final accountState = ref.watch(accountControllerProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -51,7 +48,7 @@ class AppFrame extends ConsumerWidget {
                 ],
               ),
       ),
-      drawer: _AppDrawer(authState: authState, accountState: accountState),
+      drawer: _AppDrawer(authState: authState),
       // The bottom bar lives in the body so it rides above the keyboard;
       // Scaffold.bottomNavigationBar would stay hidden behind it.
       body: bottom == null
@@ -67,14 +64,13 @@ class AppFrame extends ConsumerWidget {
 }
 
 class _AppDrawer extends ConsumerWidget {
-  const _AppDrawer({required this.authState, required this.accountState});
+  const _AppDrawer({required this.authState});
 
   final AsyncValue<AuthStatus> authState;
-  final AsyncValue<void> accountState;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isWorking = authState.isLoading || accountState.isLoading;
+    final isWorking = authState.isLoading;
 
     return Drawer(
       child: SafeArea(
@@ -167,40 +163,6 @@ class _AppDrawer extends ConsumerWidget {
             ),
             const Spacer(),
             Divider(height: 1),
-            ListTile(
-              leading: Icon(Icons.restart_alt_rounded),
-              title: Text('Reset Progress'),
-              enabled: !isWorking,
-              onTap: isWorking
-                  ? null
-                  : () async {
-                      Navigator.of(context).pop();
-                      final password = await showPasswordConfirmDialog(
-                        context,
-                        title: 'Reset progress?',
-                        description:
-                            'This deletes your meals, summaries, check-ins, and AI usage. Your profile stays.',
-                        confirmLabel: 'Reset progress',
-                        destructive: true,
-                      );
-
-                      if (password == null || !context.mounted) return;
-
-                      try {
-                        await ref
-                            .read(accountControllerProvider.notifier)
-                            .resetProgress(password: password);
-                      } catch (error) {
-                        if (!context.mounted) return;
-                        final message = error is AccountActionException
-                            ? error.message
-                            : 'Could not reset progress right now.';
-                        ScaffoldMessenger.of(
-                          context,
-                        ).showSnackBar(SnackBar(content: Text(message)));
-                      }
-                    },
-            ),
             ListTile(
               leading: Icon(Icons.logout_rounded),
               title: Text(authState.isLoading ? 'Signing out...' : 'Log out'),
