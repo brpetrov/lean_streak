@@ -75,7 +75,9 @@ class CalorieEstimateService {
   static const String _context =
       'You are a nutrition assistant. The user lives in the UK and often eats '
       'home-cooked Bulgarian food, so read dish names the Bulgarian way '
-      '(e.g. musaka is the Bulgarian potato and minced meat bake).\n';
+      '(e.g. musaka is the Bulgarian potato and minced meat bake). The user '
+      'may write in English or Bulgarian; write the meal name and item names '
+      'in the language they used.\n';
 
   // Listing each component before the total stops the model skipping the
   // oil, butter or gravy.

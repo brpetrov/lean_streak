@@ -1,19 +1,28 @@
 typedef QuickLogEntry = ({String? name, int? kcal, int? protein});
 
 const _number = r'(\d{1,3}(?:,\d{3})+|\d+)';
+// Units in English and Bulgarian. `(?!\p{L})` is a word boundary that also
+// works for Cyrillic, so "calzones" and "калцоне" are not read as units.
+const _kcalUnit = r'(?:kcals?|cals?|calories?|ккал|калории|кал)(?!\p{L})';
+const _gramUnit = r'(?:g(?:rams?)?|гр?(?:ама)?)';
+const _proteinWord = r'(?:protein|протеин|белтъ(?:к|ци|чини))';
 final _numberWithUnit = RegExp(
-  '$_number\\s*(?:kcals?|cals?|calories?)\\b',
+  '$_number\\s*$_kcalUnit',
   caseSensitive: false,
+  unicode: true,
 );
 final _trailingNumber = RegExp('$_number\\s*\$');
 final _protein = RegExp(
-  r'(\d+)\s*g(?:rams?)?\s*(?:of\s+)?protein\b|\bprotein\s*(\d+)\s*g?\b',
+  '(\\d+)\\s*$_gramUnit\\s*(?:of\\s+)?$_proteinWord(?!\\p{L})'
+  '|(?<!\\p{L})$_proteinWord\\s*(\\d+)\\s*$_gramUnit?(?!\\p{L})',
   caseSensitive: false,
+  unicode: true,
 );
 final _edgeSeparators = RegExp(r'^[\s,:\-–]+|[\s,:\-–]+$');
 
 /// Splits quick-log text like "chicken wrap 450" or "450 kcal chicken wrap"
 /// into a meal name and calories, plus protein if written as "35g protein".
+/// Units may be English or Bulgarian ("мусака 450 ккал 30г протеин").
 /// A bare number only counts as calories when it ends the text, so
 /// "2 eggs on toast" stays a name.
 QuickLogEntry parseQuickLog(String input) {

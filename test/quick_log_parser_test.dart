@@ -113,6 +113,39 @@ void main() {
       ));
     });
 
+    test('understands Bulgarian units', () {
+      expect(parseQuickLog('мусака 450 ккал'), (
+        name: 'Мусака',
+        kcal: 450,
+        protein: null,
+      ));
+      expect(parseQuickLog('450 калории мусака'), (
+        name: 'Мусака',
+        kcal: 450,
+        protein: null,
+      ));
+      expect(parseQuickLog('мусака 450 кал 30г протеин'), (
+        name: 'Мусака',
+        kcal: 450,
+        protein: 30,
+      ));
+      expect(parseQuickLog('пиле 350 ККАЛ 40 гр белтък'), (
+        name: 'Пиле',
+        kcal: 350,
+        protein: 40,
+      ));
+      expect(parseQuickLog('шейк 250 протеин 30'), (
+        name: 'Шейк',
+        kcal: 250,
+        protein: 30,
+      ));
+      expect(parseQuickLog('2 калцоне'), (
+        name: '2 калцоне',
+        kcal: null,
+        protein: null,
+      ));
+    });
+
     test('does not mistake a weight for protein', () {
       expect(parseQuickLog('chicken 200g 330'), (
         name: 'Chicken 200g',

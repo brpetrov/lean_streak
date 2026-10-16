@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lean_streak/core/constants/app_colors.dart';
 import 'package:lean_streak/providers/account_controller.dart';
 import 'package:lean_streak/providers/auth_provider.dart';
+import 'package:lean_streak/providers/preferences_provider.dart';
 import 'package:lean_streak/providers/reminder_provider.dart';
 import 'package:lean_streak/providers/user_profile_provider.dart';
 import 'package:lean_streak/widgets/password_confirm_dialog.dart';
@@ -213,6 +214,9 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
                       const _AccountSectionLabel('REMINDERS'),
                       const _ReminderSwitches(),
                       SizedBox(height: 28),
+                      const _AccountSectionLabel('VOICE'),
+                      const _VoiceLanguagePicker(),
+                      SizedBox(height: 28),
                       const _AccountSectionLabel('PASSWORD'),
                       OutlinedButton.icon(
                         onPressed: isWorking ? null : _sendPasswordReset,
@@ -294,6 +298,36 @@ class _ReminderSwitches extends ConsumerWidget {
   }
 }
 
+/// Which language the mic listens for. On Windows the recogniser is
+/// English-only whatever is chosen.
+class _VoiceLanguagePicker extends ConsumerWidget {
+  const _VoiceLanguagePicker();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final language = ref.watch(voiceLanguageProvider);
+
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Voice language'),
+      subtitle: const Text('What the mic listens for'),
+      trailing: DropdownButton<VoiceLanguage>(
+        value: language,
+        underline: const SizedBox.shrink(),
+        items: [
+          for (final option in VoiceLanguage.values)
+            DropdownMenuItem(value: option, child: Text(option.label)),
+        ],
+        onChanged: (option) {
+          if (option != null) {
+            ref.read(voiceLanguageProvider.notifier).set(option);
+          }
+        },
+      ),
+    );
+  }
+}
+
 class _AccountSectionLabel extends StatelessWidget {
   const _AccountSectionLabel(this.text);
 
@@ -324,7 +358,10 @@ class _SmallButtonSpinner extends StatelessWidget {
     return SizedBox(
       width: 22,
       height: 22,
-      child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.onPrimary),
+      child: CircularProgressIndicator(
+        strokeWidth: 2.5,
+        color: AppColors.onPrimary,
+      ),
     );
   }
 }

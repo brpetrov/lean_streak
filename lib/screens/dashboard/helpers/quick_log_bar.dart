@@ -12,6 +12,7 @@ import 'package:lean_streak/providers/ai_usage_provider.dart';
 import 'package:lean_streak/providers/auth_provider.dart';
 import 'package:lean_streak/providers/log_meal_controller.dart';
 import 'package:lean_streak/providers/meal_provider.dart';
+import 'package:lean_streak/providers/preferences_provider.dart';
 import 'package:lean_streak/screens/meals/log_meal_sheet.dart';
 import 'package:lean_streak/services/calorie_estimate_service.dart';
 import 'package:lean_streak/widgets/estimate_breakdown.dart';
@@ -182,6 +183,7 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
     });
 
     await _speechToText.listen(
+      localeId: ref.read(voiceLanguageProvider).localeId,
       onResult: (result) {
         if (!mounted) return;
         _setText(result.recognizedWords);
