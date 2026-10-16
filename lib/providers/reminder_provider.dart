@@ -1,30 +1,48 @@
+import 'package:flutter/material.dart' show TimeOfDay;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:lean_streak/helpers/weight_reminder.dart';
-import 'package:lean_streak/providers/auth_provider.dart';
 import 'package:lean_streak/providers/preferences_provider.dart';
-import 'package:lean_streak/providers/user_profile_provider.dart';
-import 'package:lean_streak/providers/weight_entry_provider.dart';
 import 'package:lean_streak/services/notification_service.dart';
 
 class ReminderSettings {
-  const ReminderSettings({required this.dailyMeal, required this.weeklyWeight});
+  const ReminderSettings({
+    required this.dailyMeal,
+    required this.weeklyWeight,
+    required this.weeklyDay,
+    required this.weeklyTime,
+  });
 
   final bool dailyMeal;
   final bool weeklyWeight;
 
-  ReminderSettings copyWith({bool? dailyMeal, bool? weeklyWeight}) {
+  /// [DateTime.monday] to [DateTime.sunday].
+  final int weeklyDay;
+  final TimeOfDay weeklyTime;
+
+  ReminderSettings copyWith({
+    bool? dailyMeal,
+    bool? weeklyWeight,
+    int? weeklyDay,
+    TimeOfDay? weeklyTime,
+  }) {
     return ReminderSettings(
       dailyMeal: dailyMeal ?? this.dailyMeal,
       weeklyWeight: weeklyWeight ?? this.weeklyWeight,
+      weeklyDay: weeklyDay ?? this.weeklyDay,
+      weeklyTime: weeklyTime ?? this.weeklyTime,
     );
   }
 }
 
-/// The two reminder switches, stored on the device (reminders are per device).
+/// The two reminder switches and the weigh-in slot (Saturday 20:00 unless
+/// changed), stored on the device since reminders are per device.
 class ReminderSettingsNotifier extends Notifier<ReminderSettings> {
   static const _dailyKey = 'reminders.daily_meal';
   static const _weeklyKey = 'reminders.weekly_weight';
+  static const _weeklyDayKey = 'reminders.weekly_weight_day';
+  static const _weeklyHourKey = 'reminders.weekly_weight_hour';
+  static const _weeklyMinuteKey = 'reminders.weekly_weight_minute';
 
   @override
   ReminderSettings build() {
@@ -32,6 +50,11 @@ class ReminderSettingsNotifier extends Notifier<ReminderSettings> {
     return ReminderSettings(
       dailyMeal: prefs.getBool(_dailyKey) ?? true,
       weeklyWeight: prefs.getBool(_weeklyKey) ?? true,
+      weeklyDay: prefs.getInt(_weeklyDayKey) ?? DateTime.saturday,
+      weeklyTime: TimeOfDay(
+        hour: prefs.getInt(_weeklyHourKey) ?? 20,
+        minute: prefs.getInt(_weeklyMinuteKey) ?? 0,
+      ),
     );
   }
 
@@ -48,6 +71,14 @@ class ReminderSettingsNotifier extends Notifier<ReminderSettings> {
   Future<bool> setWeeklyWeight(bool on) =>
       _set(on, (settings) => settings.copyWith(weeklyWeight: on));
 
+  Future<void> setWeeklySchedule({
+    required int day,
+    required TimeOfDay time,
+  }) async {
+    state = state.copyWith(weeklyDay: day, weeklyTime: time);
+    await _persist(state);
+  }
+
   Future<bool> _set(
     bool on,
     ReminderSettings Function(ReminderSettings) update,
@@ -62,6 +93,9 @@ class ReminderSettingsNotifier extends Notifier<ReminderSettings> {
     final prefs = ref.read(sharedPreferencesProvider);
     await prefs.setBool(_dailyKey, settings.dailyMeal);
     await prefs.setBool(_weeklyKey, settings.weeklyWeight);
+    await prefs.setInt(_weeklyDayKey, settings.weeklyDay);
+    await prefs.setInt(_weeklyHourKey, settings.weeklyTime.hour);
+    await prefs.setInt(_weeklyMinuteKey, settings.weeklyTime.minute);
   }
 }
 
@@ -70,22 +104,10 @@ final reminderSettingsProvider =
       ReminderSettingsNotifier.new,
     );
 
-/// Keeps the scheduled notifications in step with the switches and the
-/// latest weigh-in. Re-runs when a switch flips, the user changes, or the
-/// latest weigh-in day changes.
+/// Keeps the scheduled notifications in step with the settings. Re-runs
+/// whenever a switch flips or the weigh-in slot changes.
 final reminderSyncProvider = FutureProvider.autoDispose<void>((ref) async {
   final settings = ref.watch(reminderSettingsProvider);
-  final uid = ref.watch(currentUidProvider);
-  // null while loading, '' when there are no entries, else the latest day.
-  final latestKey = ref.watch(
-    weightEntriesProvider.select(
-      (entries) =>
-          entries.hasValue ? (entries.value!.lastOrNull?.dateKey ?? '') : null,
-    ),
-  );
-  final createdAt = ref.watch(
-    userProfileProvider.select((profile) => profile.valueOrNull?.createdAt),
-  );
 
   final notifier = ref.read(reminderSettingsProvider.notifier);
   if (notifier.isFirstRun) {
@@ -100,14 +122,16 @@ final reminderSyncProvider = FutureProvider.autoDispose<void>((ref) async {
     await NotificationService.cancelDailyMealReminder();
   }
 
-  if (!settings.weeklyWeight || uid == null) {
+  if (!settings.weeklyWeight) {
     await NotificationService.cancelWeeklyWeightReminder();
     return;
   }
-  if (latestKey == null) return;
-  final anchor = latestKey.isEmpty ? createdAt : DateTime.parse(latestKey);
-  if (anchor == null) return;
   await NotificationService.scheduleWeeklyWeightReminder(
-    firstFireAt: nextWeightReminder(lastWeighIn: anchor, now: DateTime.now()),
+    firstFireAt: nextWeekdayAt(
+      weekday: settings.weeklyDay,
+      hour: settings.weeklyTime.hour,
+      minute: settings.weeklyTime.minute,
+      now: DateTime.now(),
+    ),
   );
 });

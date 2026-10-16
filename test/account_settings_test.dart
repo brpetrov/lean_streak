@@ -50,12 +50,13 @@ final _profile = UserProfile(
 );
 
 void main() {
-  testWidgets('Reset all data asks for the password, then resets', (
-    tester,
-  ) async {
+  late SharedPreferences prefs;
+  late _FakeAccountController controller;
+
+  Future<void> pumpScreen(WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({});
-    final prefs = await SharedPreferences.getInstance();
-    final controller = _FakeAccountController();
+    prefs = await SharedPreferences.getInstance();
+    controller = _FakeAccountController();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -71,6 +72,29 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+  }
+
+  testWidgets('the weigh-in reminder defaults to Saturday 20:00; day changes', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+    expect(find.text('Saturdays at 20:00'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Saturday'));
+    await tester.tap(find.text('Saturday'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sunday').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sundays at 20:00'), findsOneWidget);
+    expect(prefs.getInt('reminders.weekly_weight_day'), DateTime.sunday);
+    expect(prefs.getInt('reminders.weekly_weight_hour'), 20);
+  });
+
+  testWidgets('Reset all data asks for the password, then resets', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
 
     await tester.ensureVisible(find.text('Reset all data'));
     await tester.tap(find.text('Reset all data'));

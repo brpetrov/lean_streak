@@ -3,51 +3,50 @@ import 'package:lean_streak/app/launch_actions.dart';
 import 'package:lean_streak/helpers/weight_reminder.dart';
 
 void main() {
-  group('nextWeightReminder', () {
-    test('is seven days after the weigh-in, at 09:00', () {
+  group('nextWeekdayAt', () {
+    // 14 October 2026 is a Wednesday.
+    test('finds the coming Saturday at the given time', () {
       expect(
-        nextWeightReminder(
-          lastWeighIn: DateTime(2026, 6, 1, 18, 30),
-          now: DateTime(2026, 6, 2),
+        nextWeekdayAt(
+          weekday: DateTime.saturday,
+          hour: 20,
+          minute: 0,
+          now: DateTime(2026, 10, 14, 10),
         ),
-        DateTime(2026, 6, 8, 9),
+        DateTime(2026, 10, 17, 20),
       );
     });
 
-    test('rolls forward in whole weeks when overdue', () {
+    test('on the day itself, counts until the time has passed', () {
       expect(
-        nextWeightReminder(
-          lastWeighIn: DateTime(2026, 6, 1),
-          now: DateTime(2026, 6, 20, 10),
+        nextWeekdayAt(
+          weekday: DateTime.saturday,
+          hour: 20,
+          minute: 0,
+          now: DateTime(2026, 10, 17, 19, 59),
         ),
-        DateTime(2026, 6, 22, 9),
+        DateTime(2026, 10, 17, 20),
+      );
+      expect(
+        nextWeekdayAt(
+          weekday: DateTime.saturday,
+          hour: 20,
+          minute: 0,
+          now: DateTime(2026, 10, 17, 20),
+        ),
+        DateTime(2026, 10, 24, 20),
       );
     });
 
-    test('the due day counts until 09:00 has passed', () {
+    test('wraps past the weekend and a month end', () {
       expect(
-        nextWeightReminder(
-          lastWeighIn: DateTime(2026, 6, 1),
-          now: DateTime(2026, 6, 8, 8, 59),
+        nextWeekdayAt(
+          weekday: DateTime.monday,
+          hour: 7,
+          minute: 30,
+          now: DateTime(2026, 10, 31, 12), // Saturday
         ),
-        DateTime(2026, 6, 8, 9),
-      );
-      expect(
-        nextWeightReminder(
-          lastWeighIn: DateTime(2026, 6, 1),
-          now: DateTime(2026, 6, 8, 9),
-        ),
-        DateTime(2026, 6, 15, 9),
-      );
-    });
-
-    test('crosses a month end', () {
-      expect(
-        nextWeightReminder(
-          lastWeighIn: DateTime(2026, 6, 27),
-          now: DateTime(2026, 6, 28),
-        ),
-        DateTime(2026, 7, 4, 9),
+        DateTime(2026, 11, 2, 7, 30),
       );
     });
   });
