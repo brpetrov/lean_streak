@@ -49,6 +49,12 @@ class DailySummaryService {
       return sum + meal.calories.round();
     });
     final calorieDelta = totalCalories - targetCalories;
+    final proteinMeals = meals.where((meal) => meal.proteinGrams != null);
+    final proteinGrams = proteinMeals.isEmpty
+        ? null
+        : proteinMeals
+              .fold<double>(0, (sum, meal) => sum + meal.proteinGrams!)
+              .round();
 
     return DailySummary(
       date: date,
@@ -56,6 +62,7 @@ class DailySummaryService {
       targetCalories: targetCalories,
       calorieDelta: calorieDelta,
       mealCount: meals.length,
+      proteinGrams: proteinGrams,
       status: _statusForCalories(
         totalCalories: totalCalories,
         targetCalories: targetCalories,

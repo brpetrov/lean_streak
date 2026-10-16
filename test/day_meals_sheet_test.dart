@@ -103,7 +103,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('Tuesday, 10 March'), findsOneWidget);
-      expect(find.text('640 of 1900 kcal'), findsOneWidget);
+      expect(find.text('640 of 1900 kcal · 31 g protein'), findsOneWidget);
       expect(find.text('Musaka'), findsOneWidget);
       expect(
         find.text('7 of 10 past-day changes left this month'),

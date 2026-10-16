@@ -22,6 +22,7 @@ class DailySummary {
     required this.targetCalories,
     required this.calorieDelta,
     required this.mealCount,
+    this.proteinGrams,
     required this.status,
     required this.updatedAt,
   });
@@ -31,6 +32,9 @@ class DailySummary {
   final int targetCalories;
   final int calorieDelta;
   final int mealCount;
+
+  /// Null when no meal that day had protein data.
+  final int? proteinGrams;
   final DailyStatus status;
   final DateTime updatedAt;
 
@@ -50,6 +54,7 @@ class DailySummary {
       targetCalories: (data['targetCalories'] as num).round(),
       calorieDelta: (data['calorieDelta'] as num).round(),
       mealCount: data['mealCount'] as int,
+      proteinGrams: (data['proteinGrams'] as num?)?.round(),
       status: _statusFromFirestore(data),
       updatedAt: (data['updatedAt'] as Timestamp).toDate(),
     );
@@ -62,6 +67,7 @@ class DailySummary {
       'targetCalories': targetCalories,
       'calorieDelta': calorieDelta,
       'mealCount': mealCount,
+      if (proteinGrams != null) 'proteinGrams': proteinGrams,
       'status': status.value,
       'updatedAt': Timestamp.fromDate(updatedAt),
     };

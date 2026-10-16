@@ -91,7 +91,8 @@ class _CalorieBar extends StatelessWidget {
     return Tooltip(
       message: summary == null
           ? '$dayLabel: no calories logged'
-          : '$dayLabel: ${summary.totalCalories} kcal',
+          : '$dayLabel: ${summary.totalCalories} kcal'
+                '${summary.proteinGrams == null ? '' : ' · ${summary.proteinGrams} g protein'}',
       waitDuration: const Duration(milliseconds: 250),
       child: Align(
         alignment: Alignment.bottomCenter,

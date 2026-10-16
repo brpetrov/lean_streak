@@ -77,6 +77,14 @@ class _DayMealsSheetState extends ConsumerState<DayMealsSheet> {
     final summary = ref
         .watch(dailySummaryForDateProvider(_dateKey))
         .valueOrNull;
+    // From the meals rather than the summary, so days logged before protein
+    // existed still show it once any meal has a value.
+    final proteinMeals = meals?.where((meal) => meal.proteinGrams != null);
+    final protein = proteinMeals == null || proteinMeals.isEmpty
+        ? null
+        : proteinMeals
+              .fold<double>(0, (sum, meal) => sum + meal.proteinGrams!)
+              .round();
     final pastDay = isPastDay(_dateKey, DateTime.now());
     final changesLeft = pastDay
         ? DayEditRepository.monthlyLimit -
@@ -123,7 +131,8 @@ class _DayMealsSheetState extends ConsumerState<DayMealsSheet> {
                           summary == null
                               ? 'Nothing logged'
                               : '${summary.totalCalories} of '
-                                    '${summary.targetCalories} kcal',
+                                    '${summary.targetCalories} kcal'
+                                    '${protein == null ? '' : ' · $protein g protein'}',
                           style: TextStyle(
                             fontSize: 14,
                             color: AppColors.textSecondary,
