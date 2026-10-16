@@ -9,8 +9,8 @@ class AccountRepository {
     return _db.collection('users').doc(uid);
   }
 
-  /// Every subcollection under the user, then the user document itself.
-  Future<void> deleteAccountData(String uid) async {
+  /// Everything the user has logged. The profile document stays.
+  Future<void> resetAllData(String uid) async {
     final userDoc = _userDoc(uid);
     for (final name in const [
       'meals',
@@ -18,11 +18,17 @@ class AccountRepository {
       'weight_entries',
       'day_edits',
       'ai_usage',
-      'check_ins',
-      'check_in_prompt_status',
     ]) {
       await _deleteCollection(userDoc.collection(name));
     }
+  }
+
+  /// [resetAllData], legacy check-in data, then the user document itself.
+  Future<void> deleteAccountData(String uid) async {
+    await resetAllData(uid);
+    final userDoc = _userDoc(uid);
+    await _deleteCollection(userDoc.collection('check_ins'));
+    await _deleteCollection(userDoc.collection('check_in_prompt_status'));
     await userDoc.delete();
   }
 

@@ -100,7 +100,7 @@ class _AppDrawer extends ConsumerWidget {
             Divider(height: 1),
             ListTile(
               leading: Icon(Icons.calendar_month_outlined),
-              title: Text('Review'),
+              title: Text('History'),
               onTap: () {
                 Navigator.of(context).pop();
                 context.push(AppRoutes.review);

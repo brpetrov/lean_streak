@@ -34,12 +34,11 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Review')),
+      appBar: AppBar(title: const Text('History')),
       body: periodsAsync.when(
         data: _buildContent,
-        loading: () => Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
+        loading: () =>
+            Center(child: CircularProgressIndicator(color: AppColors.primary)),
         error: (_, _) => Center(
           child: Text(
             'Could not load your review right now.',
@@ -528,10 +527,7 @@ class _ReviewHeadline extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               'Average ${review.averageCaloriesPerDay.round()} kcal a day',
-              style: TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-              ),
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
           ],
         ),

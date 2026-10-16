@@ -1,0 +1,88 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:lean_streak/models/user_profile.dart';
+import 'package:lean_streak/providers/account_controller.dart';
+import 'package:lean_streak/providers/auth_provider.dart';
+import 'package:lean_streak/providers/preferences_provider.dart';
+import 'package:lean_streak/providers/user_profile_provider.dart';
+import 'package:lean_streak/screens/account/account_settings_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class _FakeAccountController extends AccountController {
+  final resetPasswords = <String>[];
+
+  @override
+  Future<void> syncAuthEmailToProfile() async {}
+
+  @override
+  Future<void> resetAllData({required String password}) async {
+    resetPasswords.add(password);
+  }
+}
+
+final _now = DateTime(2026, 10, 16);
+final _profile = UserProfile(
+  uid: 'test',
+  email: 'a@b.com',
+  name: 'Test',
+  age: 30,
+  gender: Gender.male,
+  heightCm: 180,
+  currentWeightKg: 86,
+  targetWeightKg: 75,
+  activityLevel: ActivityLevel.lightlyActive,
+  trainingFrequency: TrainingFrequency.oneToTwo,
+  activityScaleVersion: currentActivityScaleVersion,
+  planCalculationVersion: currentPlanCalculationVersion,
+  weightLossPace: WeightLossPace.moderate,
+  targetDate: _now.add(const Duration(days: 150)),
+  bmi: 26.5,
+  bmr: 1800,
+  tdee: 2400,
+  dailyCalorieTarget: 1900,
+  goalPaceKgPerWeek: 0.5,
+  goalPaceLevel: GoalPaceLevel.values.first,
+  onboardingCompleted: true,
+  createdAt: _now,
+  updatedAt: _now,
+);
+
+void main() {
+  testWidgets('Reset all data asks for the password, then resets', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final controller = _FakeAccountController();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          currentUidProvider.overrideWithValue('test'),
+          userProfileProvider.overrideWith(
+            (ref) => Stream<UserProfile?>.value(_profile),
+          ),
+          authStateProvider.overrideWith((ref) => Stream<User?>.value(null)),
+          accountControllerProvider.overrideWith(() => controller),
+        ],
+        child: const MaterialApp(home: AccountSettingsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Reset all data'));
+    await tester.tap(find.text('Reset all data'));
+    await tester.pumpAndSettle();
+    expect(find.text('Reset all data?'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).last, 'hunter2');
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, 'Reset all data'));
+    await tester.pumpAndSettle();
+
+    expect(controller.resetPasswords, ['hunter2']);
+    expect(find.text('All logged data deleted.'), findsOneWidget);
+  });
+}

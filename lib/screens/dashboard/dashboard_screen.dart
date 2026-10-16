@@ -386,10 +386,7 @@ class _TodayCard extends StatelessWidget {
             Text(
               '$mealsWithoutProtein ${mealsWithoutProtein == 1 ? 'meal' : 'meals'} '
               'not counted (no protein info)',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
           ],
         ],
@@ -516,7 +513,7 @@ class _MonthPreviewCard extends ConsumerWidget {
                 ),
               ),
               Text(
-                'Review',
+                'History',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,

@@ -89,6 +89,33 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
     }
   }
 
+  Future<void> _confirmAndResetAllData() async {
+    final password = await showPasswordConfirmDialog(
+      context,
+      title: 'Reset all data?',
+      description:
+          'This deletes every meal, daily summary, weigh-in and AI usage '
+          'record. Your account, profile and plan stay.',
+      confirmLabel: 'Reset all data',
+      destructive: true,
+    );
+
+    if (password == null || !mounted) return;
+
+    try {
+      await ref
+          .read(accountControllerProvider.notifier)
+          .resetAllData(password: password);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('All logged data deleted.')));
+    } catch (error) {
+      if (!mounted) return;
+      _showAccountError(error, fallback: 'Could not reset your data.');
+    }
+  }
+
   Future<void> _confirmAndDeleteAccount() async {
     final password = await showPasswordConfirmDialog(
       context,
@@ -225,6 +252,17 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
                       ),
                       SizedBox(height: 28),
                       const _AccountSectionLabel('DANGER ZONE'),
+                      OutlinedButton.icon(
+                        onPressed: isWorking ? null : _confirmAndResetAllData,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(52),
+                          side: BorderSide(color: AppColors.error),
+                          foregroundColor: AppColors.error,
+                        ),
+                        icon: Icon(Icons.restart_alt_rounded),
+                        label: Text('Reset all data'),
+                      ),
+                      SizedBox(height: 12),
                       OutlinedButton.icon(
                         onPressed: isWorking ? null : _confirmAndDeleteAccount,
                         style: OutlinedButton.styleFrom(

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:lean_streak/providers/account_provider.dart';
 import 'package:lean_streak/providers/auth_provider.dart';
+import 'package:lean_streak/providers/daily_summary_provider.dart';
+import 'package:lean_streak/providers/meal_provider.dart';
 import 'package:lean_streak/providers/user_profile_provider.dart';
 
 class AccountActionException implements Exception {
@@ -109,6 +111,21 @@ class AccountController extends AsyncNotifier<void> {
     } on FirebaseAuthException catch (error, stackTrace) {
       state = AsyncError(error, stackTrace);
       throw AccountActionException(_mapAuthError(error));
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+      rethrow;
+    }
+  }
+
+  Future<void> resetAllData({required String password}) async {
+    state = const AsyncLoading();
+
+    try {
+      final user = await _reauthenticate(password);
+      await ref.read(accountRepositoryProvider).resetAllData(user.uid);
+      ref.invalidate(dailySummaryRepositoryProvider);
+      ref.invalidate(recentMealsProvider);
+      state = const AsyncData(null);
     } catch (error, stackTrace) {
       state = AsyncError(error, stackTrace);
       rethrow;
