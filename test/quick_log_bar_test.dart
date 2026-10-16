@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import 'package:lean_streak/providers/log_meal_controller.dart';
 import 'package:lean_streak/providers/meal_provider.dart';
 import 'package:lean_streak/screens/dashboard/helpers/quick_log_bar.dart';
 import 'package:lean_streak/services/calorie_estimate_service.dart';
+import 'package:record/record.dart';
 
 class _FakeLogMealController extends LogMealController {
   final saved = <({String? name, double calories, double? protein})>[];
@@ -43,9 +45,18 @@ class _FakeEstimateService implements CalorieEstimateService {
     );
   }
 
+  Uint8List? heard;
+
   @override
-  Future<VoiceMealParsed> parseVoice(String transcript) async =>
-      (name: 'Lunch', kcal: 400, protein: null, items: const <EstimateItem>[]);
+  Future<VoiceMealParsed> parseVoiceAudio(Uint8List wav) async {
+    heard = wav;
+    return (
+      name: 'Lunch',
+      kcal: 400,
+      protein: null,
+      items: const <EstimateItem>[],
+    );
+  }
 
   @override
   Future<int?> estimateProtein(String name, int kcal) async => 30;
@@ -53,6 +64,30 @@ class _FakeEstimateService implements CalorieEstimateService {
   @override
   Future<VoiceMealParsed> estimateFromPhoto(String uid, Uint8List jpeg) =>
       throw UnimplementedError();
+}
+
+/// A microphone that plays back whatever the test feeds it.
+class _FakeRecorder extends Fake implements AudioRecorder {
+  final audio = StreamController<Uint8List>();
+  bool stopped = false;
+
+  @override
+  Future<bool> hasPermission({bool request = true}) async => true;
+
+  @override
+  Future<Stream<Uint8List>> startStream(RecordConfig config) async =>
+      audio.stream;
+
+  @override
+  Stream<Amplitude> onAmplitudeChanged(Duration interval) =>
+      const Stream.empty();
+
+  @override
+  Future<String?> stop() async {
+    stopped = true;
+    await audio.close();
+    return null;
+  }
 }
 
 Meal _recent(String name, double kcal, double? protein) => Meal(
@@ -69,6 +104,7 @@ Meal _recent(String name, double kcal, double? protein) => Meal(
 void main() {
   late _FakeLogMealController controller;
   late _FakeEstimateService estimateService;
+  late _FakeRecorder recorder;
 
   Future<void> pumpCard(
     WidgetTester tester, {
@@ -76,6 +112,7 @@ void main() {
   }) async {
     controller = _FakeLogMealController();
     estimateService = _FakeEstimateService();
+    recorder = _FakeRecorder();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -83,6 +120,7 @@ void main() {
           calorieEstimateServiceProvider.overrideWithValue(estimateService),
           currentUidProvider.overrideWithValue('user-1'),
           recentMealsProvider.overrideWith((ref) async => recents),
+          audioRecorderProvider.overrideWithValue(recorder),
         ],
         child: const MaterialApp(home: Scaffold(body: QuickLogBar())),
       ),
@@ -183,6 +221,43 @@ void main() {
     expect(controller.saved, [
       (name: 'Chicken wrap', calories: 450.0, protein: 30.0),
     ]);
+  });
+
+  testWidgets('the mic records a note and the AI fills the box from it', (
+    tester,
+  ) async {
+    await pumpCard(tester);
+    await tester.tap(find.byTooltip('Speak'));
+    await tester.pump();
+    expect(
+      find.text('Listening... tap stop when you\'re done.'),
+      findsOneWidget,
+    );
+
+    recorder.audio.add(Uint8List(32000)); // one second of 16-bit mono
+    await tester.pump();
+    await tester.tap(find.byTooltip('Stop'));
+    await tester.pumpAndSettle();
+
+    expect(recorder.stopped, isTrue);
+    expect(estimateService.heard!.length, 44 + 32000);
+    expect(boxText(tester), 'Lunch 400 kcal');
+  });
+
+  testWidgets('a mis-tap on the mic is not sent to the AI', (tester) async {
+    await pumpCard(tester);
+    await tester.tap(find.byTooltip('Speak'));
+    await tester.pump();
+    recorder.audio.add(Uint8List(2000));
+    await tester.pump();
+    await tester.tap(find.byTooltip('Stop'));
+    await tester.pumpAndSettle();
+
+    expect(estimateService.heard, isNull);
+    expect(
+      find.text('Didn\'t catch that. Tap the mic and try again.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('keyboard done saves when calories are present', (tester) async {

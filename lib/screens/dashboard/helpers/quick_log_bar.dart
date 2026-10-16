@@ -1,27 +1,36 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:speech_to_text/speech_recognition_error.dart';
-import 'package:speech_to_text/speech_to_text.dart';
+import 'package:record/record.dart';
 
 import 'package:lean_streak/core/constants/app_colors.dart';
 import 'package:lean_streak/helpers/quick_log_parser.dart';
+import 'package:lean_streak/helpers/wav.dart';
 import 'package:lean_streak/models/meal.dart';
 import 'package:lean_streak/providers/ai_usage_provider.dart';
 import 'package:lean_streak/providers/auth_provider.dart';
 import 'package:lean_streak/providers/log_meal_controller.dart';
 import 'package:lean_streak/providers/meal_provider.dart';
-import 'package:lean_streak/providers/preferences_provider.dart';
 import 'package:lean_streak/screens/meals/log_meal_sheet.dart';
 import 'package:lean_streak/services/calorie_estimate_service.dart';
 import 'package:lean_streak/widgets/estimate_breakdown.dart';
 
+/// The microphone behind the bar's mic button; overridable in tests.
+final audioRecorderProvider = Provider<AudioRecorder>((ref) {
+  final recorder = AudioRecorder();
+  ref.onDispose(recorder.dispose);
+  return recorder;
+});
+
 /// The log composer pinned to the bottom of Today, under the thumb.
 /// "chicken wrap 450" saves straight away; a meal without calories can be
 /// estimated by the AI, or a photo taken. With the box empty the main
-/// button is the mic. While the box is focused, recent meals are offered as
-/// chips for one-tap re-logging.
+/// button is the mic: it records a short note that the AI listens to
+/// itself, in English, Bulgarian or a mix. While the box is focused, recent
+/// meals are offered as chips for one-tap re-logging.
 class QuickLogBar extends ConsumerStatefulWidget {
   const QuickLogBar({super.key});
 
@@ -30,12 +39,24 @@ class QuickLogBar extends ConsumerStatefulWidget {
 }
 
 class _QuickLogBarState extends ConsumerState<QuickLogBar> {
+  static const _sampleRate = 16000;
+  static const _maxRecording = Duration(seconds: 30);
+  // Auto-stop: once something has been said, this much near-silence ends
+  // the recording, like a speech recogniser's pause timeout.
+  static const _silenceAfterSpeech = Duration(milliseconds: 2500);
+  static const _speechDbfs = -30.0;
+  static const _silenceDbfs = -45.0;
+
   final _controller = TextEditingController();
-  final _speechToText = SpeechToText();
   final _focusNode = FocusNode();
 
-  bool _speechInitialized = false;
-  bool _speechAvailable = false;
+  final _chunks = <Uint8List>[];
+  StreamSubscription<Uint8List>? _audioSub;
+  StreamSubscription<Amplitude>? _levelSub;
+  Timer? _stopTimer;
+  bool _heardSpeech = false;
+  DateTime? _quietSince;
+
   bool _listening = false;
   bool _working = false;
   List<EstimateItem> _aiItems = const [];
@@ -61,7 +82,10 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
 
   @override
   void dispose() {
-    _speechToText.cancel();
+    _stopTimer?.cancel();
+    _levelSub?.cancel();
+    _audioSub?.cancel();
+    if (_listening) ref.read(audioRecorderProvider).cancel();
     _focusNode.dispose();
     _controller.dispose();
     super.dispose();
@@ -153,28 +177,22 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
 
   Future<void> _toggleListening() async {
     if (_listening) {
-      await _speechToText.stop();
-      _finishListening();
+      await _finishListening();
       return;
     }
 
-    if (!_speechInitialized) {
-      _speechAvailable = await _speechToText.initialize(
-        onStatus: (status) {
-          if (status == 'done' || status == 'notListening') {
-            _finishListening();
-          }
-        },
-        onError: _onSpeechError,
-      );
-      _speechInitialized = true;
+    final recorder = ref.read(audioRecorderProvider);
+    if (!await recorder.hasPermission()) {
+      if (mounted) {
+        setState(() => _error = 'Allow microphone access to log by voice.');
+      }
+      return;
     }
     if (!mounted) return;
-    if (!_speechAvailable) {
-      setState(() => _error = 'Speech input is not available on this device.');
-      return;
-    }
 
+    _chunks.clear();
+    _heardSpeech = false;
+    _quietSince = null;
     _setText('');
     setState(() {
       _listening = true;
@@ -182,32 +200,72 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
       _error = null;
     });
 
-    await _speechToText.listen(
-      localeId: ref.read(voiceLanguageProvider).localeId,
-      onResult: (result) {
-        if (!mounted) return;
-        _setText(result.recognizedWords);
-        if (result.finalResult) _finishListening();
-      },
-      listenFor: const Duration(seconds: 30),
-      pauseFor: const Duration(seconds: 3),
-      listenOptions: SpeechListenOptions(partialResults: true),
-    );
+    try {
+      final audio = await recorder.startStream(
+        const RecordConfig(
+          encoder: AudioEncoder.pcm16bits,
+          sampleRate: _sampleRate,
+          numChannels: 1,
+        ),
+      );
+      _audioSub = audio.listen(_chunks.add);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _listening = false;
+        _error = 'Could not start recording. Try again.';
+      });
+      return;
+    }
+    _levelSub = recorder
+        .onAmplitudeChanged(const Duration(milliseconds: 250))
+        .listen(_onLevel);
+    _stopTimer = Timer(_maxRecording, _finishListening);
   }
 
-  /// Runs once per recording, whichever of final result, status change or
-  /// manual stop arrives first.
-  void _finishListening() {
+  /// Ends the recording by itself after a pause, once something was said.
+  void _onLevel(Amplitude level) {
+    if (level.current >= _speechDbfs) _heardSpeech = true;
+    if (level.current > _silenceDbfs) {
+      _quietSince = null;
+      return;
+    }
+    if (!_heardSpeech) return;
+    final since = _quietSince ??= DateTime.now();
+    if (DateTime.now().difference(since) >= _silenceAfterSpeech) {
+      _finishListening();
+    }
+  }
+
+  /// Stops the recording (whichever of the stop button, a pause or the time
+  /// cap comes first) and has the AI listen to it.
+  Future<void> _finishListening() async {
     if (!mounted || !_listening) return;
     setState(() => _listening = false);
+    _stopTimer?.cancel();
+    _levelSub?.cancel();
+    await ref.read(audioRecorderProvider).stop();
+    _audioSub?.cancel();
+    if (!mounted) return;
 
-    final transcript = _controller.text.trim();
-    if (transcript.isEmpty) return;
+    final pcm = Uint8List(_chunks.fold(0, (n, chunk) => n + chunk.length));
+    var offset = 0;
+    for (final chunk in _chunks) {
+      pcm.setRange(offset, offset + chunk.length, chunk);
+      offset += chunk.length;
+    }
+    _chunks.clear();
 
-    _runAi(() async {
+    // Under half a second (16-bit mono) is a mis-tap, not a meal.
+    if (pcm.length < _sampleRate) {
+      setState(() => _error = 'Didn\'t catch that. Tap the mic and try again.');
+      return;
+    }
+
+    await _runAi(() async {
       final result = await ref
           .read(calorieEstimateServiceProvider)
-          .parseVoice(transcript);
+          .parseVoiceAudio(wavFromPcm16(pcm, sampleRate: _sampleRate));
       if (!mounted) return;
       _setText('${result.name} ${_amounts(result.kcal, result.protein)}');
       _aiItems = result.items;
@@ -241,16 +299,6 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
       if (!mounted) return;
       _setText('${result.name} ${_amounts(result.kcal, result.protein)}');
       _aiItems = result.items;
-    });
-  }
-
-  void _onSpeechError(SpeechRecognitionError error) {
-    if (!mounted) return;
-    setState(() {
-      _listening = false;
-      _error = error.errorMsg == 'error_no_match'
-          ? 'No speech detected. Tap the mic to try again.'
-          : 'Speech input failed. Try again.';
     });
   }
 

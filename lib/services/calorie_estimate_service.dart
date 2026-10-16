@@ -98,8 +98,9 @@ class CalorieEstimateService {
 
   static const String _voicePromptTemplate =
       '$_context'
-      'The user spoke a voice note about a meal. Extract a short meal name, '
-      'the total calories and the total protein.\n'
+      'The user recorded a voice note about a meal, in English, Bulgarian or '
+      'a mix of both. Listen to it and extract a short meal name, the total '
+      'calories and the total protein.\n'
       'List every component with its calories and protein. If the user stated '
       'a calorie or protein amount for something, use that exact number for '
       'it. Otherwise estimate it: use any amounts the user gives, assume a '
@@ -109,12 +110,12 @@ class CalorieEstimateService {
       'If the user gave calories but no protein, still estimate the protein '
       'from the food. Only if nothing in the note says what the food was '
       '(e.g. "400 calories for lunch"), set protein_g to null.\n'
-      'Respond with ONLY a JSON object: {"name": "<short meal name>", '
-      '"items": [{"item": "<component>", "kcal": <integer>, "protein_g": '
-      '<integer or null>}], "kcal": <integer total>, "protein_g": <integer '
-      'total or null>}\n'
-      'Do not include any other text.\n\n'
-      'Transcript: {input}';
+      'If the recording contains no meal, respond with {"error": "no meal"}.\n'
+      'Respond with ONLY a JSON object: {"transcript": "<what the user said>", '
+      '"name": "<short meal name>", "items": [{"item": "<component>", "kcal": '
+      '<integer>, "protein_g": <integer or null>}], "kcal": <integer total>, '
+      '"protein_g": <integer total or null>}\n'
+      'Do not include any other text.';
 
   static const String _photoPromptTemplate =
       '$_context'
@@ -178,24 +179,34 @@ class CalorieEstimateService {
     }
   }
 
-  Future<VoiceMealParsed> parseVoice(String transcript) async {
+  /// Recognises the meal in a short WAV voice note, in English, Bulgarian
+  /// or a mix; the model does the listening, so no language setting is
+  /// needed. Doesn't count towards the daily AI limit (one call per note,
+  /// as before).
+  Future<VoiceMealParsed> parseVoiceAudio(Uint8List wav) async {
     try {
-      final prompt = _voicePromptTemplate.replaceFirst(
-        '{input}',
-        transcript.trim(),
-      );
       final map = _decode(
-        await _generateWithRetries(_model, [Content.text(prompt)]),
+        await _generateWithRetries(_model, [
+          Content.multi([
+            TextPart(_voicePromptTemplate),
+            DataPart('audio/wav', wav),
+          ]),
+        ]),
       );
+      if (map['error'] != null || map['kcal'] is! num) {
+        throw const CalorieEstimateException(
+          'Couldn\'t hear a meal in that. Tap the mic and try again.',
+        );
+      }
       return _mealFrom(map);
     } on CalorieEstimateException {
       rethrow;
     } on ServerException catch (error, st) {
-      debugPrint('CalorieEstimateService voice parse error: $error\n$st');
+      debugPrint('CalorieEstimateService voice error: $error\n$st');
       throw CalorieEstimateException(_friendlyServerError(error.message));
     } catch (error, st) {
-      debugPrint('CalorieEstimateService voice parse error: $error\n$st');
-      throw CalorieEstimateException(
+      debugPrint('CalorieEstimateService voice error: $error\n$st');
+      throw const CalorieEstimateException(
         'Could not process voice input right now.',
       );
     }

@@ -51,8 +51,6 @@
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>LeanStreak uses the microphone so you can describe meals by voice for AI calorie estimates.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>LeanStreak uses speech recognition so you can dictate meal descriptions for AI calorie estimates.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>LeanStreak uses the camera so you can photograph a meal for an AI calorie estimate.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

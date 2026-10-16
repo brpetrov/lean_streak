@@ -28,7 +28,7 @@ firebase deploy --only firestore:rules  # Deploy Firestore security rules
 
 **Data flow:** Repository pattern. Each Firestore collection has a repository (`lib/repositories/`) that handles reads/writes. Services (`lib/services/`) compose repositories for business logic. Providers (`lib/providers/`) expose state to the UI and wire up controllers.
 
-**Device settings:** Theme, reminder switches and voice language live in SharedPreferences through `sharedPreferencesProvider` (`lib/providers/preferences_provider.dart`), overridden in `main()` so readers never wait on it.
+**Device settings:** Theme and reminder switches live in SharedPreferences through `sharedPreferencesProvider` (`lib/providers/preferences_provider.dart`), overridden in `main()` so readers never wait on it.
 
 **Firestore structure:** All user data lives under `/users/{uid}/` with subcollections for meals, daily summaries, weight entries, AI usage and past-day edits (period reviews are computed, not stored; old `check_ins` documents are only deleted along with the account). Reset progress on Weight & Progress clears `weight_entries` only.. Security rules enforce owner-only access.
 
@@ -50,7 +50,7 @@ Key models: `UserProfile` (with enums for Gender, ActivityLevel, TrainingFrequen
 ## Conventions
 
 - Dart SDK `^3.11.4`, uses modern Dart 3 features (switch expressions, pattern matching, records).
-- `speech_to_text` drives the quick-log mic; the Voice language setting (`voiceLanguageProvider`: System/English/Bulgarian) is passed as `localeId`. Windows speech recognition is English-only regardless. `quick_log_parser.dart` reads English and Bulgarian units (ккал/кал/калории, г/гр протеин/белтък).
+- Voice logging records a short clip with `record` (16 kHz mono PCM, wrapped as WAV by `lib/helpers/wav.dart`) and sends the audio to Gemini (`parseVoiceAudio`), which understands English, Bulgarian or a mix with no language setting. Recording ends on the Stop button, after a pause once something was said, or at 30 s. `quick_log_parser.dart` reads English and Bulgarian units (ккал/кал/калории, г/гр протеин/белтък).
 - `lib/core/config/api_keys.dart` holds the Gemini API key, treat as sensitive.
 - `NotificationService` (`flutter_local_notifications`) schedules a daily meal reminder (20:30) and a weekly weigh-in reminder (a week after the last weigh-in, 09:00); the switches are in Account Settings and `reminderSyncProvider` keeps the schedules in step. A notification tap becomes a `LaunchAction` (`lib/app/launch_actions.dart`, set before the widget tree exists) that Today consumes; the app-icon shortcut and home-screen widget use the same path.
 - The app targets web primarily but also supports Android and iOS.
