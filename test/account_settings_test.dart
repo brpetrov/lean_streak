@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lean_streak/core/theme/app_theme.dart';
 import 'package:lean_streak/models/user_profile.dart';
 import 'package:lean_streak/providers/account_controller.dart';
 import 'package:lean_streak/providers/auth_provider.dart';
@@ -68,7 +69,10 @@ void main() {
           authStateProvider.overrideWith((ref) => Stream<User?>.value(null)),
           accountControllerProvider.overrideWith(() => controller),
         ],
-        child: const MaterialApp(home: AccountSettingsScreen()),
+        child: MaterialApp(
+          theme: AppTheme.light,
+          home: const AccountSettingsScreen(),
+        ),
       ),
     );
     await tester.pumpAndSettle();

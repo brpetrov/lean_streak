@@ -379,7 +379,7 @@ class _ReminderSwitches extends ConsumerWidget {
                 },
               ),
               const SizedBox(width: 12),
-              OutlinedButton.icon(
+              TextButton.icon(
                 onPressed: pickTime,
                 icon: const Icon(Icons.schedule_rounded),
                 label: Text(_clock(settings.weeklyTime)),
