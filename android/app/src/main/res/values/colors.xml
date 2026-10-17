@@ -4,9 +4,8 @@
     <color name="launch_background">#F6F4EF</color>
 
     <!-- The home-screen widget, from AppPalette.light. -->
-    <color name="widget_field">#FDFCF9</color>
-    <color name="widget_field_outline">#E8E4DC</color>
-    <color name="widget_hint">#6E6A63</color>
+    <color name="widget_surface">#FDFCF9</color>
+    <color name="widget_outline">#E8E4DC</color>
     <color name="widget_primary">#2E7D6E</color>
     <color name="widget_on_primary">#FFFFFF</color>
 </resources>
