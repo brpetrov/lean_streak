@@ -58,6 +58,7 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
   Timer? _stopTimer;
   bool _heardSpeech = false;
   DateTime? _quietSince;
+  AppLifecycleListener? _resumeListener;
 
   bool _listening = false;
   bool _working = false;
@@ -101,9 +102,37 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
       if (action == LaunchAction.voiceLog) {
         _toggleListening();
       } else {
-        _focusNode.requestFocus();
-        // Focus alone doesn't always raise the keyboard this early in a
-        // cold start.
+        _whenResumed(_focusForTyping);
+      }
+    });
+  }
+
+  /// Runs [action] once the window has focus. Android drops a keyboard
+  /// request made before then, which is the case right after a widget tap
+  /// brings the app forward: the box ended up focused with the keyboard down.
+  void _whenResumed(VoidCallback action) {
+    final state = WidgetsBinding.instance.lifecycleState;
+    if (state == null || state == AppLifecycleState.resumed) {
+      action();
+      return;
+    }
+    _resumeListener?.dispose();
+    _resumeListener = AppLifecycleListener(
+      onResume: () {
+        _resumeListener?.dispose();
+        _resumeListener = null;
+        if (mounted) action();
+      },
+    );
+  }
+
+  /// Focus raises the keyboard by itself in the normal case; after a launch
+  /// Android sometimes drops that first request, so ask once more shortly
+  /// after.
+  void _focusForTyping() {
+    _focusNode.requestFocus();
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (mounted && _focusNode.hasFocus) {
         SystemChannels.textInput.invokeMethod('TextInput.show');
       }
     });
@@ -111,6 +140,7 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
 
   @override
   void dispose() {
+    _resumeListener?.dispose();
     _stopTimer?.cancel();
     _levelSub?.cancel();
     _audioSub?.cancel();

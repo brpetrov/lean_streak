@@ -320,6 +320,7 @@ void main() {
     final field = tester.widget<TextField>(find.byType(TextField));
     expect(field.focusNode!.hasFocus, isTrue);
     expect(container.read(launchActionProvider), isNull);
+    await tester.pump(const Duration(milliseconds: 500)); // the keyboard retry
   });
 
   testWidgets('keyboard done saves when calories are present', (tester) async {
