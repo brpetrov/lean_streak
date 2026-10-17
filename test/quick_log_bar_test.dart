@@ -311,6 +311,17 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('a type launch action focuses the box for the keyboard', (
+    tester,
+  ) async {
+    await pumpCard(tester, launchAction: LaunchAction.typeLog);
+    await tester.pump();
+
+    final field = tester.widget<TextField>(find.byType(TextField));
+    expect(field.focusNode!.hasFocus, isTrue);
+    expect(container.read(launchActionProvider), isNull);
+  });
+
   testWidgets('keyboard done saves when calories are present', (tester) async {
     await pumpCard(tester);
     await tester.enterText(find.byType(TextField), '450 kcal porridge');

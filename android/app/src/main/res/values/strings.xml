@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="log_widget_name">Quick log</string>
+    <string name="log_widget_description">Type or speak a meal from your home screen.</string>
+    <string name="log_widget_hint">Type a meal</string>
+    <string name="log_widget_mic">Speak a meal</string>
+</resources>

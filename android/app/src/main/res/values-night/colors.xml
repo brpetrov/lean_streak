@@ -2,4 +2,11 @@
 <resources>
     <!-- Matches AppPalette.dark.background. -->
     <color name="launch_background">#171513</color>
+
+    <!-- The home-screen widget, from AppPalette.dark. -->
+    <color name="widget_field">#211E1B</color>
+    <color name="widget_field_outline">#332E2A</color>
+    <color name="widget_hint">#B3ACA3</color>
+    <color name="widget_primary">#5FB3A3</color>
+    <color name="widget_on_primary">#0F1F1B</color>
 </resources>

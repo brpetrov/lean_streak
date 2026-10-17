@@ -58,6 +58,10 @@ void main() {
         LaunchAction.voiceLog,
       );
       expect(
+        launchActionForUri(Uri.parse('leanstreak://log/text')),
+        LaunchAction.typeLog,
+      );
+      expect(
         launchActionForUri(Uri.parse('leanstreak://log/weight')),
         LaunchAction.logWeight,
       );

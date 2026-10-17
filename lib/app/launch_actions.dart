@@ -9,7 +9,7 @@ import 'package:lean_streak/services/notification_service.dart';
 /// Something the user asked for from outside the app: a notification tap, the
 /// app-icon shortcut or the home-screen widget. Set by [bindLaunchActions] and
 /// consumed once by the screen that can do it.
-enum LaunchAction { logWeight, voiceLog }
+enum LaunchAction { logWeight, voiceLog, typeLog }
 
 /// The app-icon shortcut's id.
 const shortcutLogVoice = 'log_voice';
@@ -28,9 +28,11 @@ final launchActionProvider =
       LaunchActionNotifier.new,
     );
 
-/// `leanstreak://log/voice` and `leanstreak://log/weight`.
+/// `leanstreak://log/voice`, `leanstreak://log/text` and
+/// `leanstreak://log/weight`.
 LaunchAction? launchActionForUri(Uri? uri) => switch ((uri?.host, uri?.path)) {
   ('log', '/voice') => LaunchAction.voiceLog,
+  ('log', '/text') => LaunchAction.typeLog,
   ('log', '/weight') => LaunchAction.logWeight,
   _ => null,
 };

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
@@ -86,15 +87,25 @@ class _QuickLogBarState extends ConsumerState<QuickLogBar> {
     );
   }
 
-  /// A tap on the app-icon shortcut or the home-screen widget: start the mic
-  /// as soon as there is a frame to do it on (on a cold start this runs
-  /// inside initState).
+  /// A tap on the app-icon shortcut or the home-screen widget: start the
+  /// mic, or focus the box with the keyboard up, as soon as there is a frame
+  /// to do it on (on a cold start this runs inside initState).
   void _onLaunchAction(LaunchAction? action) {
-    if (action != LaunchAction.voiceLog) return;
+    if (action != LaunchAction.voiceLog && action != LaunchAction.typeLog) {
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(launchActionProvider.notifier).clear();
-      if (!_listening && !_working) _toggleListening();
+      if (_listening || _working) return;
+      if (action == LaunchAction.voiceLog) {
+        _toggleListening();
+      } else {
+        _focusNode.requestFocus();
+        // Focus alone doesn't always raise the keyboard this early in a
+        // cold start.
+        SystemChannels.textInput.invokeMethod('TextInput.show');
+      }
     });
   }
 
